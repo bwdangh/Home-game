@@ -196,6 +196,7 @@ tr.tot td{border-bottom:0;font-weight:800}
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
+const APP_VERSION = '5 · Contacts';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -756,6 +757,7 @@ function viewSettings(){
     <div class="small muted">Last backup: <b>${esc(last)}</b>. Copy the backup and save it in Notes, or send it to your partner. On the other phone, open Restore and paste it.</div>
     <div class="row"><button class="btn sm" data-act="exportData">Copy backup</button><button class="btn sm ghost" data-act="importData">Restore from backup</button></div>
   </div>
+  <div class="card stack"><h2>About</h2><div class="small muted">App version <b>${APP_VERSION}</b> · Contact list ${canPickContacts() ? '<b class="in">available</b>' : '<b class="owes-house">not turned on in Safari</b>'}</div></div>
   <div class="card stack"><h2>Erase everything</h2><div class="small muted">Deletes all nights, players, expenses and the passcode on this phone.</div><button class="btn sm danger" data-act="resetAll">Erase all data</button></div>`];
 }
 
@@ -779,7 +781,7 @@ function parseVCF(text){
 }
 // Gets contacts from the picker, or from a chosen .vcf file when the picker isn't available
 async function getContacts(multiple, fileInput){
-  if (canPickContacts()){ try { return await pickContacts(multiple); } catch(e){ return []; } }
+  if (canPickContacts()){ try { return await pickContacts(multiple); } catch(e){ if (!fileInput) { toast('Contacts could not open. Try again.'); return []; } } }
   return new Promise(resolve => {
     fileInput.onchange = async () => {
       const out = [];
@@ -1181,7 +1183,7 @@ document.addEventListener('visibilitychange', () => {
 
 load();
 try { navigator.storage?.persist?.(); } catch(e){}
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
 render();
 })();
 </script>
