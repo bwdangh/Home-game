@@ -7,20 +7,21 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<style>html{background:#0b1411}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<style>html{background:#0b0d17}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 <title>Home Game Ledger</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Home Game">
-<meta name="theme-color" content="#0b1411">
+<meta name="theme-color" content="#0b0d17">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <style>
-/* Layout: phone-first single column. Flat dark-green surfaces, one gold primary action, color = meaning (green in, coral out, amber owed to house, blue house owes). */
+/* Layout: phone-first single column. Midnight surfaces with soft violet glow, one violet-to-pink gradient for primary actions, color = meaning (mint in, rose out, amber owed to house, sky house owes). */
 :root{
-  --bg:#0b1411; --surface:#121d19; --surface-2:#192823; --surface-3:#21332c; --line:#253a32;
-  --ink:#eef4f0; --muted:#8ea59b; --faint:#5f7569;
-  --gold:#e9b85b; --gold-ink:#1f1606; --emerald:#2fbf88;
-  --in:#45d39b; --out:#ff8b7b; --owes-house:#f6b74a; --owes-player:#6cb8ff;
+  --bg:#0b0d17; --surface:#14172a; --surface-2:#1b1f38; --surface-3:#252a4a; --line:#2a2f55;
+  --ink:#f4f5ff; --muted:#9ca2cc; --faint:#666c99;
+  --gold:#8b7bff; --gold-hi:#b9adff; --gold-ink:#ffffff; --emerald:#2ee6a6;
+  --grad:linear-gradient(135deg,#6d5dfc 0%,#a855f7 55%,#ec4899 100%); --glow:0 10px 28px -8px rgba(139,92,246,.6);
+  --in:#2ee6a6; --out:#ff6b8b; --owes-house:#ffb547; --owes-player:#4cc3ff;
   --font:"Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
   --r:18px;
   color-scheme:dark;
@@ -39,17 +40,17 @@ h3{font-size:.95rem;font-weight:700}
 .small{font-size:.86rem}
 
 #app{max-width:640px;margin:0 auto;min-height:100%;padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
-header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(11,20,17,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(11,13,23,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
 header.top .grow{flex:1;min-width:0}
 header.top .sub{font-size:.84rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 main{padding:16px;display:grid;gap:12px}
 
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(18,29,25,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(20,23,42,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center}
 nav.tabs .in{display:flex;width:100%;max-width:640px;gap:4px}
 nav.tabs button{flex:1;background:none;border:0;padding:6px 2px;display:grid;justify-items:center;gap:3px;color:var(--faint);font-size:.68rem;font-weight:600;cursor:pointer;border-radius:12px}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-current="true"]{color:var(--gold)}
-nav.tabs button[aria-current="true"] svg{filter:drop-shadow(0 0 8px rgba(233,184,91,.35))}
+nav.tabs button[aria-current="true"] svg{filter:drop-shadow(0 0 8px rgba(139,123,255,.55))}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
 .card.tap{cursor:pointer;display:block;width:100%;text-align:left;color:var(--ink)}
@@ -63,22 +64,22 @@ nav.tabs button[aria-current="true"] svg{filter:drop-shadow(0 0 8px rgba(233,184
 .kv .total{border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
 hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 
-.btn{appearance:none;border:0;background:var(--gold);color:var(--gold-ink);font-weight:700;border-radius:14px;padding:10px 16px;cursor:pointer;min-height:46px}
-.btn:active{filter:brightness(.92)}
-.btn.ghost{background:var(--surface-3);color:var(--ink)}
+.btn{appearance:none;border:0;background:var(--grad);color:var(--gold-ink);box-shadow:var(--glow);transition:transform .15s ease,filter .15s ease,box-shadow .2s ease;font-weight:700;border-radius:14px;padding:10px 16px;cursor:pointer;min-height:46px}
+.btn:active{transform:scale(.98);filter:brightness(.95)}
+.btn.ghost{background:var(--surface-3);color:var(--ink);box-shadow:none}
 .btn.sm{min-height:36px;padding:6px 12px;font-size:.88rem;border-radius:11px}
-.btn.danger{background:rgba(255,139,123,.12);color:var(--out)}
+.btn.danger{box-shadow:none;background:rgba(255,107,139,.12);color:var(--out)}
 .btn.block{width:100%}
 .btn:disabled{opacity:.4}
 .btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,nav.tabs button:focus-visible,.card.tap:focus-visible,.seatrow:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .iconbtn{background:var(--surface-2);border:0;color:var(--ink);border-radius:12px;width:40px;height:40px;display:grid;place-items:center;cursor:pointer}
 
 .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:700;background:var(--surface-3);color:var(--muted)}
-.pill.open{background:rgba(69,211,155,.14);color:var(--in)}
+.pill.open{background:rgba(46,230,166,.14);color:var(--in)}
 .pill.open::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .pill.closed{background:var(--surface-3);color:var(--muted)}
-.pill.reg{background:rgba(233,184,91,.14);color:var(--gold)}
-.pill.wait{background:rgba(246,183,74,.14);color:var(--owes-house)}
+.pill.reg{background:rgba(139,123,255,.18);color:var(--gold-hi)}
+.pill.wait{background:rgba(255,181,71,.14);color:var(--owes-house)}
 .owes-house{color:var(--owes-house)} .owes-player{color:var(--owes-player)} .win,.in{color:var(--in)} .loss,.out{color:var(--out)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px}
 
@@ -94,7 +95,7 @@ textarea{min-height:80px;resize:vertical}
 .grid2>*{min-width:0}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:7px 13px;cursor:pointer;color:var(--ink);font-size:.9rem;font-weight:500}
-.chip[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink);border-color:var(--gold);font-weight:700}
+.chip[aria-pressed="true"]{background:var(--grad);color:#fff;border-color:transparent;font-weight:700;box-shadow:var(--glow)}
 .chip:disabled{opacity:.3;cursor:not-allowed}
 
 /* Stat tiles */
@@ -147,8 +148,8 @@ tr.tot td{border-bottom:0;font-weight:800}
 .flow .line{display:flex;justify-content:space-between;gap:6px;font-size:.84rem}
 .flow .head{display:flex;justify-content:space-between;font-weight:800}
 .badge{display:inline-flex;align-items:center;gap:6px;border-radius:12px;padding:10px 12px;font-weight:700;font-size:.92rem}
-.badge.ok{background:rgba(69,211,155,.12);color:var(--in)}
-.badge.warn{background:rgba(246,183,74,.12);color:var(--owes-house)}
+.badge.ok{background:rgba(46,230,166,.12);color:var(--in)}
+.badge.warn{background:rgba(255,181,71,.12);color:var(--owes-house)}
 
 .empty{text-align:center;padding:28px 16px;color:var(--muted);display:grid;gap:12px;justify-items:center}
 .suits{font-size:1.3rem;letter-spacing:.35em;color:var(--gold)}
@@ -165,10 +166,10 @@ tr.tot td{border-bottom:0;font-weight:800}
 .lock .box{width:100%;max-width:340px;display:grid;gap:20px;justify-items:center;text-align:center}
 .dots{display:flex;gap:14px;min-height:14px}
 .dots i{width:13px;height:13px;border-radius:50%;background:var(--surface-3)}
-.dots i.on{background:var(--gold)}
+.dots i.on{background:var(--grad);box-shadow:0 0 12px rgba(168,85,247,.7)}
 .pad{display:grid;grid-template-columns:repeat(3,74px);gap:14px}
 .pad button{width:74px;height:74px;border-radius:50%;border:0;background:var(--surface-2);font-size:1.5rem;font-weight:600;color:var(--ink);cursor:pointer}
-.pad button:active{background:var(--gold);color:var(--gold-ink)}
+.pad button:active{background:var(--grad);color:#fff}
 .chipmark{width:68px;height:68px;border-radius:20px;background:var(--gold);display:grid;place-items:center;color:var(--gold-ink);font-size:2rem;font-weight:800}
 .chipmark span{line-height:1}
 
@@ -191,6 +192,17 @@ tr.tot td{border-bottom:0;font-weight:800}
 .session[open] summary{padding-bottom:10px;border-bottom:1px solid var(--line)}
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;display:block;text-align:left}
 .grid2 input,.grid2 select{min-width:0;max-width:100%}
+body{background:radial-gradient(90% 50% at 0% 0%,rgba(109,93,252,.22),transparent 60%),radial-gradient(70% 40% at 100% 100%,rgba(236,72,153,.14),transparent 60%),var(--bg);background-attachment:fixed}
+.card{transition:background .2s ease,border-color .2s ease}
+.segs button{transition:background .2s ease,color .2s ease}
+.segs button[aria-pressed="true"]{background:linear-gradient(135deg,rgba(109,93,252,.35),rgba(236,72,153,.25));color:#fff;box-shadow:inset 0 0 0 1px rgba(185,173,255,.25)}
+nav.tabs button{transition:color .2s ease}
+nav.tabs button[aria-current="true"]{color:var(--gold-hi)}
+.stat>div{border:1px solid rgba(255,255,255,.04)}
+.settle .hero{background:linear-gradient(135deg,rgba(109,93,252,.22),rgba(236,72,153,.12)),var(--surface-2)}
+.toast{background:var(--grad);color:#fff;box-shadow:var(--glow)}
+input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;box-shadow:0 0 0 3px rgba(139,123,255,.25)}
+.iconbtn{transition:background .2s ease}
 </style>
 
 </head>
@@ -201,7 +213,7 @@ input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-wi
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '6 · Sessions';
+const APP_VERSION = '7 · New look';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -209,7 +221,7 @@ const SETTLE = 'Settle at end';
 const NETTED = 'Netted from chips';
 const CATEGORIES = ['Rent / Venue','Food & Drinks','Cards & Chips','Equipment','Supplies','Staff','Other'];
 // Soft, distinct tints that read well on dark felt, one per seat
-const COLORS = ['#5eead4','#a78bfa','#60a5fa','#f472b6','#fbbf24','#4ade80','#fb923c','#c084fc','#38bdf8','#f87171'];
+const COLORS = ['#22d3ee','#a78bfa','#f472b6','#34d399','#60a5fa','#fb923c','#e879f9','#facc15','#2dd4bf','#fb7185'];
 
 /* ---------- data ---------- */
 const blank = () => ({ version:2, passHash:null, players:[], nights:[], expenses:[], lastBackup:null });
@@ -331,7 +343,7 @@ function renderLock(){
   const sub = setting ? 'Six digits. Share it only with your partner.' : 'Host access only';
   $app.innerHTML = `
   <div class="lock"><div class="box">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="84" height="84" style="border-radius:20px;display:block" aria-hidden="true">   <defs>     <radialGradient id="bg" cx="50%" cy="38%" r="75%">       <stop offset="0" stop-color="#17463a"/>       <stop offset=".55" stop-color="#0e2a22"/>       <stop offset="1" stop-color="#08140f"/>     </radialGradient>     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">       <stop offset="0" stop-color="#f7d58b"/>       <stop offset=".5" stop-color="#e9b85b"/>       <stop offset="1" stop-color="#c38f35"/>     </linearGradient>     <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">       <stop offset="0" stop-color="#14382e"/>       <stop offset="1" stop-color="#0b2019"/>     </linearGradient>   </defs>   <rect width="84" height="84" style="border-radius:20px;display:block" aria-hidden="true" fill="url(#bg)"/>   <!-- chip shadow -->   <ellipse cx="512" cy="560" rx="330" ry="330" fill="#000" opacity=".35"/>   <!-- chip body -->   <circle cx="512" cy="512" r="330" fill="url(#gold)"/>   <!-- edge inserts -->   <g fill="#0e2a22">     <g id="ins"><path d="M512 182 L560 186 L554 262 L470 262 L464 186 Z"/></g>     <use href="#ins" transform="rotate(60 512 512)"/>     <use href="#ins" transform="rotate(120 512 512)"/>     <use href="#ins" transform="rotate(180 512 512)"/>     <use href="#ins" transform="rotate(240 512 512)"/>     <use href="#ins" transform="rotate(300 512 512)"/>   </g>   <!-- inner face -->   <circle cx="512" cy="512" r="236" fill="url(#face)"/>   <circle cx="512" cy="512" r="236" fill="none" stroke="url(#gold)" stroke-width="10"/>   <circle cx="512" cy="512" r="212" fill="none" stroke="#e9b85b" stroke-width="3" stroke-dasharray="6 14" opacity=".55"/>   <!-- spade -->   <path fill="url(#gold)" d="M512 352     C 470 410 384 452 384 530     C 384 584 426 618 470 618     C 488 618 500 612 506 604     C 502 640 488 664 452 680     L 572 680     C 536 664 522 640 518 604     C 524 612 536 618 554 618     C 598 618 640 584 640 530     C 640 452 554 410 512 352 Z"/> </svg> 
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="84" height="84" style="border-radius:20px;display:block" aria-hidden="true">   <defs>     <radialGradient id="bg" cx="30%" cy="20%" r="95%">       <stop offset="0" stop-color="#2a1f6e"/>       <stop offset=".55" stop-color="#12142b"/>       <stop offset="1" stop-color="#0a0b18"/>     </radialGradient>     <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">       <stop offset="0" stop-color="#6d5dfc"/>       <stop offset=".55" stop-color="#a855f7"/>       <stop offset="1" stop-color="#ec4899"/>     </linearGradient>     <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">       <stop offset="0" stop-color="#1d1f45"/>       <stop offset="1" stop-color="#11122a"/>     </linearGradient>     <linearGradient id="spade" x1="0" y1="0" x2="0" y2="1">       <stop offset="0" stop-color="#ffffff"/>       <stop offset="1" stop-color="#e3dcff"/>     </linearGradient>     <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="40"/></filter>   </defs>   <rect width="84" height="84" style="border-radius:20px;display:block" aria-hidden="true" fill="url(#bg)"/>   <circle cx="512" cy="530" r="330" fill="#a855f7" opacity=".45" filter="url(#glow)"/>   <circle cx="512" cy="512" r="330" fill="url(#ring)"/>   <g fill="#ffffff" opacity=".92">     <g id="ins"><path d="M512 182 L558 186 L552 258 L472 258 L466 186 Z"/></g>     <use href="#ins" transform="rotate(60 512 512)"/>     <use href="#ins" transform="rotate(120 512 512)"/>     <use href="#ins" transform="rotate(180 512 512)"/>     <use href="#ins" transform="rotate(240 512 512)"/>     <use href="#ins" transform="rotate(300 512 512)"/>   </g>   <circle cx="512" cy="512" r="238" fill="url(#face)"/>   <circle cx="512" cy="512" r="214" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="6 14" opacity=".28"/>   <path fill="url(#spade)" d="M512 352     C 470 410 384 452 384 530     C 384 584 426 618 470 618     C 488 618 500 612 506 604     C 502 640 488 664 452 680     L 572 680     C 536 664 522 640 518 604     C 524 612 536 618 554 618     C 598 618 640 584 640 530     C 640 452 554 410 512 352 Z"/> </svg>  
     <h1>Home Game Ledger</h1>
     <div><h2>${title}</h2><div class="muted small">${sub}</div></div>
     <div class="dots" aria-label="${UI.entry.length} of 6 digits entered">${[0,1,2,3,4,5].map(i => `<i class="${i < UI.entry.length ? 'on' : ''}"></i>`).join('')}</div>
