@@ -122,7 +122,9 @@ textarea{min-height:80px;resize:vertical}
 .actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
 .actions .btn{min-height:40px;padding:6px 8px;font-size:.9rem;border-radius:11px}
 .history{font-size:.85rem;display:grid;gap:4px;margin-top:6px}
-.history .h{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:5px}
+.history .h{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid var(--line);padding:7px 0 2px;width:100%;background:none;border-left:0;border-right:0;border-bottom:0;color:inherit;font:inherit;text-align:left;cursor:pointer;min-height:36px}
+.history button.h:active{background:var(--surface-3)}
+.history .pen{color:var(--gold-hi);margin-left:6px}
 .history button{background:none;border:0;color:var(--faint);cursor:pointer;padding:4px 6px}
 details summary{cursor:pointer}
 
@@ -214,7 +216,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '8 · Fixed menu';
+const APP_VERSION = '9 · Edit buy-ins';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -317,7 +319,7 @@ function colorOf(n, pid){
 }
 
 /* ---------- UI state ---------- */
-const UI = { locked:true, tab:'nights', nightId:null, nightTab:'money', month:null, report:'month', reportPlayer:null, entry:'' };
+const UI = { locked:true, tab:'nights', nightId:null, nightTab:'money', month:null, report:'month', reportPlayer:null, entry:'', histOpen: new Set() };
 const $app = document.getElementById('app');
 let sheetEl = null;
 
@@ -476,16 +478,21 @@ function playerCard(n, pid){
   if (!l.checkedOut){
     status = !l.buyin ? '<span class="muted">Seated, no buy-in yet</span>'
       : l.owesHouse > 0 ? `<span class="owes-house"><span class="dot"></span>Settle at end · owes house ${money(l.owesHouse)}</span>`
+      : l.owesHouse < 0 ? `<span class="owes-player"><span class="dot"></span>Paid ${money(-l.owesHouse)} more than the buy-in</span>`
       : '<span class="in"><span class="dot"></span>Playing · buy-in paid</span>';
   } else {
     status = l.houseOwes > 0 ? `<span class="owes-player"><span class="dot"></span>Checked out · house owes ${money(l.houseOwes)}</span>`
       : l.owesHouse > 0 ? `<span class="owes-house"><span class="dot"></span>Checked out · still owes ${money(l.owesHouse)}</span>`
+      : l.houseOwes < 0 ? `<span class="owes-house"><span class="dot"></span>Checked out · house overpaid ${money(-l.houseOwes)}</span>`
+      : l.owesHouse < 0 ? `<span class="owes-player"><span class="dot"></span>Checked out · player overpaid ${money(-l.owesHouse)}</span>`
       : '<span class="muted"><span class="dot"></span>Checked out · settled</span>';
   }
   const hist = l.e.slice().sort((a,b) => a.t - b.t).map(x => {
     const what = { buyin: 'Buy-in', bpay:'Player paid', cashout:'Cash-out (chips)', cpay:'House paid' }[x.kind];
     const time = new Date(x.t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    return `<div class="h"><span>${what}${x.method ? ' · ' + esc(x.method) : ''} <span class="muted">${time}</span></span><span class="num">${money(x.amount)} <button data-del-entry="${x.id}" aria-label="Delete this line">✕</button></span></div>`;
+    const body = `<span>${what}${x.method ? ' · ' + esc(x.method) : ''} <span class="muted">${time}</span></span><span class="num">${money(x.amount)}`;
+    return x.method === NETTED ? `<div class="h">${body}</span></div>`
+      : `<button class="h" data-edit-entry="${x.id}" aria-label="Edit ${what} ${money(x.amount)}">${body} <span class="pen" aria-hidden="true">✎</span></span></button>`;
   }).join('');
   const btns = [
     !l.checkedOut ? `<button class="btn ghost" data-act="rebuy" data-pid="${pid}">${l.buyin ? 'Rebuy' : 'Buy in'}</button>` : '',
@@ -510,7 +517,7 @@ function playerCard(n, pid){
       ${r?.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}
     </div>
     <div class="actions">${btns}</div>
-    ${l.e.length ? `<details><summary class="small muted">History (${l.e.length})</summary><div class="history">${hist}</div></details>` : ''}
+    ${l.e.length ? `<details data-hist="${pid}" ${UI.histOpen.has(pid) ? 'open' : ''}><summary class="small muted">History · tap a line to edit (${l.e.length})</summary><div class="history">${hist}</div></details>` : ''}
   </div>`;
 }
 function nightSeats(n){
@@ -1060,6 +1067,62 @@ function balanceSheet(n, pid, kind){
   });
 }
 
+// Payments made at buy-in time share the buy-in's timestamp base (see recordBuyin).
+const linkedPays = (n, b) => n.entries.filter(x => x.pid === b.pid && x.kind === 'bpay' && x.method !== NETTED && x.t > b.t && x.t < b.t + 100);
+const centsStr = c => String(c / 100);
+// Redo the "netted from chips" pair after an edit, so a settle-at-end balance is still offset correctly against the cash-out.
+function renet(n, pid){
+  n.entries = n.entries.filter(x => !(x.pid === pid && x.method === NETTED));
+  const co = n.entries.filter(x => x.pid === pid && x.kind === 'cashout');
+  if (!co.length) return;
+  const l = playerLedger(n, pid), offset = Math.min(Math.max(0, l.owesHouse), l.cashout);
+  if (offset > 0){
+    const t = co[0].t;
+    n.entries.push({ id: uid(), pid, kind:'bpay', amount: offset, method: NETTED, t: t+1 });
+    n.entries.push({ id: uid(), pid, kind:'cpay', amount: offset, method: NETTED, t: t+2 });
+  }
+}
+function editBuyinSheet(n, b){
+  const pays = linkedPays(n, b);
+  const lines = pays.length ? pays.map(x => payLine(true, centsStr(x.amount), x.method)).join('') : payLine(true, '', SETTLE);
+  openSheet(`<div class="label">Edit buy-in</div><h2>${esc(pname(b.pid))}</h2>
+    <div class="field"><label for="mAmt">Buy-in amount</label><input id="mAmt" inputmode="decimal" value="${centsStr(b.amount)}" data-nofocus="1"></div>
+    <div class="field" data-paylines data-settle="1"><label>How they paid</label><div class="lines stack">${lines}</div>
+    <button type="button" class="btn sm ghost" data-addline style="justify-self:start">+ Split between methods</button></div>
+    <div class="small muted">Pick "${SETTLE}" for any part they haven't paid yet.</div>
+    ${actions('Save changes')}
+    <button type="button" class="btn danger sm" id="eDel">Delete this buy-in</button>`, () => {
+    const amt = toCents(val('mAmt')); if (!(amt > 0)) return 'Enter the buy-in amount.';
+    const r = readLines(amt); if (r.err) return r.err; if (r.paid > amt) return `Payments add up to ${money(r.paid)}, more than the ${money(amt)} buy-in.`;
+    const ids = pays.map(x => x.id);
+    n.entries = n.entries.filter(x => !ids.includes(x.id));
+    b.amount = amt;
+    r.lines.forEach((l, i) => n.entries.push({ id: uid(), pid: b.pid, kind:'bpay', amount: l.amount, method: l.method, t: b.t + 1 + i }));
+    renet(n, b.pid);
+    toast(r.paid < amt ? `Saved · ${money(amt - r.paid)} to settle at end` : 'Buy-in updated');
+  });
+  document.getElementById('eDel').addEventListener('click', () => {
+    const ids = [b.id, ...pays.map(x => x.id)];
+    confirmSheet('Delete this buy-in?', `${esc(pname(b.pid))}: ${money(b.amount)} and the payments recorded with it.`, 'Delete', () => { n.entries = n.entries.filter(x => !ids.includes(x.id)); renet(n, b.pid); });
+  });
+}
+function editEntrySheet(n, x){
+  const what = { bpay:'Payment from player', cashout:'Cash-out (chips)', cpay:'Payment to player' }[x.kind];
+  openSheet(`<div class="label">Edit ${what.toLowerCase()}</div><h2>${esc(pname(x.pid))}</h2>
+    <div class="field"><label for="mAmt">${x.kind === 'cashout' ? 'Chips cashed out' : 'Amount'}</label><input id="mAmt" inputmode="decimal" value="${centsStr(x.amount)}" data-nofocus="1"></div>
+    ${x.method ? methodPicker('eMethod', x.method) : ''}
+    ${actions('Save changes')}
+    <button type="button" class="btn danger sm" id="eDel">Delete this line</button>`, () => {
+    const amt = toCents(val('mAmt'));
+    if (!(amt > 0) && !(x.kind === 'cashout' && amt === 0)) return 'Enter the amount.';
+    x.amount = amt; if (x.method) x.method = val('eMethod');
+    renet(n, x.pid); toast('Updated');
+  });
+  document.getElementById('eDel').addEventListener('click', () => {
+    confirmSheet('Delete this line?', `${esc(pname(x.pid))}: ${what} ${money(x.amount)}${x.method ? ' · ' + esc(x.method) : ''}`, 'Delete', () => { n.entries = n.entries.filter(y => y.id !== x.id); renet(n, x.pid); });
+  });
+}
+
 function notesSheet(n, pid){
   let r = rsvp(n, pid);
   openSheet(`<div class="label">Notes for tonight</div><h2>${esc(pname(pid))}</h2>
@@ -1133,6 +1196,7 @@ function expenseSheet(x){
 }
 
 /* ---------- events ---------- */
+document.addEventListener('toggle', e => { const h = e.target.dataset?.hist; if (h) e.target.open ? UI.histOpen.add(h) : UI.histOpen.delete(h); }, true);
 document.addEventListener('click', e => {
   const t = e.target.closest('button,[data-open-night],[data-report-player]'); if (!t) return;
   if (t.closest('.scrim')) return; // sheets handle their own clicks
@@ -1148,7 +1212,7 @@ document.addEventListener('click', e => {
   if (d.hp){ document.getElementById('hpSign').value = d.hp; t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === t)); return; }
   const n = night(UI.nightId);
   if (d.playerNight) return playerNightSheet(n, d.playerNight);
-  if (d.delEntry){ const x = n.entries.find(y => y.id === d.delEntry); return confirmSheet('Delete this line?', `${esc(pname(x.pid))}: ${money(x.amount)}${x.method ? ' · ' + esc(x.method) : ''}`, 'Delete', () => { n.entries = n.entries.filter(y => y.id !== x.id); }); }
+  if (d.editEntry){ const x = n.entries.find(y => y.id === d.editEntry); if (x) return x.kind === 'buyin' ? editBuyinSheet(n, x) : editEntrySheet(n, x); return; }
   switch (d.act){
     case 'newNight':
       return openSheet(`<h2>Set up a game night</h2>${nightFields()}${actions('Create night')}`, () => {
