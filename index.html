@@ -27,7 +27,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{height:100%}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font);-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 .num,table,.v{font-variant-numeric:tabular-nums}
@@ -39,13 +39,14 @@ h3{font-size:.95rem;font-weight:700}
 .muted{color:var(--muted)}
 .small{font-size:.86rem}
 
-#app{max-width:640px;margin:0 auto;min-height:100%;padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
-header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(11,13,23,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+/* App shell: the page itself never scrolls; only <main> does, so the tab bar can't drift on iPhone. */
+#app{position:fixed;inset:0;max-width:640px;margin:0 auto;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+header.top{flex:none;position:relative;z-index:5;background:rgba(11,13,23,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
 header.top .grow{flex:1;min-width:0}
 header.top .sub{font-size:.84rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-main{padding:16px;display:grid;gap:12px}
+main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px 16px 24px;display:grid;gap:12px;align-content:start}
 
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(20,23,42,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center}
+nav.tabs{flex:none;position:relative;z-index:6;background:rgba(20,23,42,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center}
 nav.tabs .in{display:flex;width:100%;max-width:640px;gap:4px}
 nav.tabs button{flex:1;background:none;border:0;padding:6px 2px;display:grid;justify-items:center;gap:3px;color:var(--faint);font-size:.68rem;font-weight:600;cursor:pointer;border-radius:12px}
 nav.tabs button svg{width:22px;height:22px}
@@ -162,7 +163,7 @@ tr.tot td{border-bottom:0;font-weight:800}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;z-index:30;font-weight:700;font-size:.9rem;max-width:calc(100% - 32px);text-align:center}
 
 /* Lock screen */
-.lock{min-height:100%;display:grid;place-items:center;padding:24px 16px}
+.lock{flex:1;overflow-y:auto;display:grid;place-items:center;padding:24px 16px}
 .lock .box{width:100%;max-width:340px;display:grid;gap:20px;justify-items:center;text-align:center}
 .dots{display:flex;gap:14px;min-height:14px}
 .dots i{width:13px;height:13px;border-radius:50%;background:var(--surface-3)}
@@ -192,7 +193,7 @@ tr.tot td{border-bottom:0;font-weight:800}
 .session[open] summary{padding-bottom:10px;border-bottom:1px solid var(--line)}
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;display:block;text-align:left}
 .grid2 input,.grid2 select{min-width:0;max-width:100%}
-body{background:radial-gradient(90% 50% at 0% 0%,rgba(109,93,252,.22),transparent 60%),radial-gradient(70% 40% at 100% 100%,rgba(236,72,153,.14),transparent 60%),var(--bg);background-attachment:fixed}
+body{background:radial-gradient(90% 50% at 0% 0%,rgba(109,93,252,.22),transparent 60%),radial-gradient(70% 40% at 100% 100%,rgba(236,72,153,.14),transparent 60%),var(--bg)}
 .card{transition:background .2s ease,border-color .2s ease}
 .segs button{transition:background .2s ease,color .2s ease}
 .segs button[aria-pressed="true"]{background:linear-gradient(135deg,rgba(109,93,252,.35),rgba(236,72,153,.25));color:#fff;box-shadow:inset 0 0 0 1px rgba(185,173,255,.25)}
@@ -213,7 +214,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '7 · New look';
+const APP_VERSION = '8 · Fixed menu';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -392,8 +393,14 @@ function render(){
   else [head, body] = viewSettings();
   const warn = storageOK ? '' : `<div class="card owes-house small">This browser is not saving data right now. Copy a backup from Settings before closing.</div>`;
   const tab = (k, label) => `<button data-tab="${k}" aria-current="${UI.tab === k}">${ICON[k]}${label}</button>`;
+  // Keep the list where it was after saving; start at the top when switching screens
+  const view = [UI.tab, UI.nightId, UI.nightTab, UI.report].join('|');
+  const oldMain = $app.querySelector('main');
+  const keep = oldMain && UI.lastView === view && !UI.resetScroll ? oldMain.scrollTop : 0;
+  UI.lastView = view; UI.resetScroll = false;
   $app.innerHTML = `<header class="top">${head}</header><main>${warn}${body}</main>
     <nav class="tabs"><div class="in">${tab('nights','Nights')}${tab('players','Players')}${tab('expenses','Expenses')}${tab('reports','Reports')}${tab('settings','Settings')}</div></nav>`;
+  if (keep) $app.querySelector('main').scrollTop = keep;
 }
 
 function viewNights(){
@@ -1131,8 +1138,8 @@ document.addEventListener('click', e => {
   if (t.closest('.scrim')) return; // sheets handle their own clicks
   const d = t.dataset;
   if (d.key) return keyPress(d.key);
-  if (d.tab){ UI.tab = d.tab; if (d.tab === 'nights') UI.nightId = null; render(); scrollTo(0,0); return; }
-  if (d.openNight){ UI.tab = 'nights'; UI.nightId = d.openNight; UI.nightTab = night(d.openNight)?.status === 'closed' ? 'close' : 'money'; render(); scrollTo(0,0); return; }
+  if (d.tab){ UI.tab = d.tab; if (d.tab === 'nights') UI.nightId = null; UI.resetScroll = true; render(); return; }
+  if (d.openNight){ UI.tab = 'nights'; UI.nightId = d.openNight; UI.nightTab = night(d.openNight)?.status === 'closed' ? 'close' : 'money'; UI.resetScroll = true; render(); return; }
   if (d.nightTab){ UI.nightTab = d.nightTab; render(); return; }
   if (d.report){ UI.report = d.report; render(); return; }
   if (d.reportPlayer){ UI.reportPlayer = d.reportPlayer; render(); return; }
