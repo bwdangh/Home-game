@@ -1,0 +1,1114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>html{background:#0b1411}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>Home Game Ledger</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Home Game">
+<meta name="theme-color" content="#0b1411">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: phone-first single column. Flat dark-green surfaces, one gold primary action, color = meaning (green in, coral out, amber owed to house, blue house owes). */
+:root{
+  --bg:#0b1411; --surface:#121d19; --surface-2:#192823; --surface-3:#21332c; --line:#253a32;
+  --ink:#eef4f0; --muted:#8ea59b; --faint:#5f7569;
+  --gold:#e9b85b; --gold-ink:#1f1606; --emerald:#2fbf88;
+  --in:#45d39b; --out:#ff8b7b; --owes-house:#f6b74a; --owes-player:#6cb8ff;
+  --font:"Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:18px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font);-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+.num,table,.v{font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:1.35rem;font-weight:800}
+h2{font-size:1.06rem;font-weight:700}
+h3{font-size:.95rem;font-weight:700}
+.label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+
+#app{max-width:640px;margin:0 auto;min-height:100%;padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(11,20,17,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+header.top .grow{flex:1;min-width:0}
+header.top .sub{font-size:.84rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main{padding:16px;display:grid;gap:12px}
+
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(18,29,25,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center}
+nav.tabs .in{display:flex;width:100%;max-width:640px;gap:4px}
+nav.tabs button{flex:1;background:none;border:0;padding:6px 2px;display:grid;justify-items:center;gap:3px;color:var(--faint);font-size:.68rem;font-weight:600;cursor:pointer;border-radius:12px}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-current="true"]{color:var(--gold)}
+nav.tabs button[aria-current="true"] svg{filter:drop-shadow(0 0 8px rgba(233,184,91,.35))}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card.tap{cursor:pointer;display:block;width:100%;text-align:left;color:var(--ink)}
+.card.tap:active{background:var(--surface-2)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row .grow{flex:1;min-width:0}
+.stack{display:grid;gap:10px}
+.split{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.kv{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:baseline}
+.kv .v{text-align:right;font-weight:700}
+.kv .total{border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+
+.btn{appearance:none;border:0;background:var(--gold);color:var(--gold-ink);font-weight:700;border-radius:14px;padding:10px 16px;cursor:pointer;min-height:46px}
+.btn:active{filter:brightness(.92)}
+.btn.ghost{background:var(--surface-3);color:var(--ink)}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:.88rem;border-radius:11px}
+.btn.danger{background:rgba(255,139,123,.12);color:var(--out)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.4}
+.btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,nav.tabs button:focus-visible,.card.tap:focus-visible,.seatrow:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.iconbtn{background:var(--surface-2);border:0;color:var(--ink);border-radius:12px;width:40px;height:40px;display:grid;place-items:center;cursor:pointer}
+
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:700;background:var(--surface-3);color:var(--muted)}
+.pill.open{background:rgba(69,211,155,.14);color:var(--in)}
+.pill.open::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.closed{background:var(--surface-3);color:var(--muted)}
+.pill.reg{background:rgba(233,184,91,.14);color:var(--gold)}
+.pill.wait{background:rgba(246,183,74,.14);color:var(--owes-house)}
+.owes-house{color:var(--owes-house)} .owes-player{color:var(--owes-player)} .win,.in{color:var(--in)} .loss,.out{color:var(--out)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px}
+
+.segs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+.segs button{flex:1;background:none;border:0;border-radius:10px;padding:9px 4px;color:var(--muted);font-weight:600;cursor:pointer;font-size:.92rem}
+.segs button[aria-pressed="true"]{background:var(--surface-3);color:var(--ink)}
+
+.field{display:grid;gap:5px}
+.field label{font-size:.78rem;color:var(--muted);font-weight:600}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;min-height:46px;font-size:16px}
+textarea{min-height:80px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2>*{min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:7px 13px;cursor:pointer;color:var(--ink);font-size:.9rem;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink);border-color:var(--gold);font-weight:700}
+.chip:disabled{opacity:.3;cursor:not-allowed}
+
+/* Stat tiles */
+.stat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat>div{background:var(--surface-2);border-radius:14px;padding:12px}
+.stat .v{font-size:1.3rem;font-weight:800;margin-top:2px}
+.stat .hint{font-size:.76rem;color:var(--muted)}
+.net{font-size:1.6rem;font-weight:800}
+
+/* Player cards: tinted by seat color */
+.player{display:grid;gap:12px;background:linear-gradient(180deg,var(--pcbg,transparent),transparent 70%),var(--surface);border-color:var(--pcline,var(--line))}
+.namebtn{background:none;border:0;padding:0;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left;min-width:0;color:var(--ink)}
+.namebtn h2{font-size:1.1rem}
+.seat{display:inline-grid;place-items:center;width:32px;height:32px;flex:none;border-radius:10px;background:var(--pc,var(--gold));color:#0b1411;font-weight:800;font-size:.9rem}
+.seat.open{background:transparent;border:1.5px dashed var(--line);color:var(--faint)}
+.minis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.minis>div{background:rgba(255,255,255,.035);border-radius:12px;padding:8px 10px;min-width:0}
+.minis .v{font-weight:800;font-size:1.02rem}
+.minis .label{font-size:.64rem}
+.statusline{font-size:.9rem;font-weight:600}
+.paidby{font-size:.82rem;color:var(--muted)}
+.note{font-style:italic;color:var(--muted);font-size:.88rem}
+.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
+.actions .btn{min-height:40px;padding:6px 8px;font-size:.9rem;border-radius:11px}
+.history{font-size:.85rem;display:grid;gap:4px;margin-top:6px}
+.history .h{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:5px}
+.history button{background:none;border:0;color:var(--faint);cursor:pointer;padding:4px 6px}
+details summary{cursor:pointer}
+
+/* Tables */
+.tablewrap{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
+tr.tot td{border-bottom:0;font-weight:800}
+
+/* Settlement */
+.settle{display:grid;gap:14px}
+.settle .hero{display:grid;gap:4px;background:var(--surface-2);border-radius:14px;padding:14px}
+.settle .hero .big{font-size:1.9rem;font-weight:800;letter-spacing:-.02em}
+.methodrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 0;border-top:1px solid var(--line)}
+.methodrow .m{font-weight:700}
+.methodrow .amt{font-weight:800;font-size:1.08rem;text-align:right}
+.methodrow .calc{grid-column:1/-1;font-size:.8rem;color:var(--muted)}
+.owelist{display:grid;gap:6px}
+.owelist .o{display:flex;justify-content:space-between;gap:10px;background:var(--surface-2);border-radius:12px;padding:9px 12px}
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.flow>div{background:var(--surface-2);border-radius:14px;padding:12px;display:grid;gap:4px;min-width:0}
+.flow .line{display:flex;justify-content:space-between;gap:6px;font-size:.84rem}
+.flow .head{display:flex;justify-content:space-between;font-weight:800}
+.badge{display:inline-flex;align-items:center;gap:6px;border-radius:12px;padding:10px 12px;font-weight:700;font-size:.92rem}
+.badge.ok{background:rgba(69,211,155,.12);color:var(--in)}
+.badge.warn{background:rgba(246,183,74,.12);color:var(--owes-house)}
+
+.empty{text-align:center;padding:28px 16px;color:var(--muted);display:grid;gap:12px;justify-items:center}
+.suits{font-size:1.3rem;letter-spacing:.35em;color:var(--gold)}
+
+/* Bottom sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);border-radius:22px 22px 0 0;width:100%;max-width:640px;max-height:92%;overflow:auto;padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:14px;border-top:1px solid var(--line)}
+.sheet .handle{width:40px;height:5px;border-radius:3px;background:var(--surface-3);margin:0 auto}
+.err{color:var(--out);font-size:.88rem;font-weight:600}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;z-index:30;font-weight:700;font-size:.9rem;max-width:calc(100% - 32px);text-align:center}
+
+/* Lock screen */
+.lock{min-height:100%;display:grid;place-items:center;padding:24px 16px}
+.lock .box{width:100%;max-width:340px;display:grid;gap:20px;justify-items:center;text-align:center}
+.dots{display:flex;gap:14px;min-height:14px}
+.dots i{width:13px;height:13px;border-radius:50%;background:var(--surface-3)}
+.dots i.on{background:var(--gold)}
+.pad{display:grid;grid-template-columns:repeat(3,74px);gap:14px}
+.pad button{width:74px;height:74px;border-radius:50%;border:0;background:var(--surface-2);font-size:1.5rem;font-weight:600;color:var(--ink);cursor:pointer}
+.pad button:active{background:var(--gold);color:var(--gold-ink)}
+.chipmark{width:68px;height:68px;border-radius:20px;background:var(--gold);display:grid;place-items:center;color:var(--gold-ink);font-size:2rem;font-weight:800}
+.chipmark span{line-height:1}
+
+/* Seats */
+.seatgrid{display:grid;gap:6px}
+.seatrow{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid transparent;border-radius:14px;padding:9px 12px;width:100%;text-align:left;cursor:pointer;color:var(--ink)}
+.seatrow.filled{background:linear-gradient(90deg,var(--pcbg),transparent),var(--surface-2);border-color:var(--pcline)}
+.seatrow .grow{flex:1;min-width:0}
+.payline{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) 40px;gap:8px;align-items:center}
+.payline .x{background:var(--surface-2);border:0;border-radius:10px;height:40px;color:var(--muted);cursor:pointer}
+.preview{background:var(--surface-2);border-radius:14px;padding:12px;display:grid;gap:5px;font-size:.92rem}
+.closegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.closegrid>.card{display:grid;gap:8px;align-content:start;min-width:0;padding:14px}
+.closegrid .segs{padding:3px}
+.closegrid .segs button{padding:6px 2px;font-size:.85rem}
+@media (max-width:360px){.closegrid,.flow{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .2s cubic-bezier(.2,.8,.2,1)}@keyframes up{from{transform:translateY(40px);opacity:.5}}}
+</style>
+
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(() => {
+'use strict';
+const KEY = 'homeGameLedger.v1';
+const MAX_PLAYERS = 40;
+const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
+const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
+const SETTLE = 'Settle at end';
+const NETTED = 'Netted from chips';
+const CATEGORIES = ['Rent / Venue','Food & Drinks','Cards & Chips','Equipment','Supplies','Staff','Other'];
+// Soft, distinct tints that read well on dark felt, one per seat
+const COLORS = ['#5eead4','#a78bfa','#60a5fa','#f472b6','#fbbf24','#4ade80','#fb923c','#c084fc','#38bdf8','#f87171'];
+
+/* ---------- data ---------- */
+const blank = () => ({ version:2, passHash:null, players:[], nights:[], expenses:[], lastBackup:null });
+let D = blank();
+let storageOK = true;
+function migrate(){
+  D.nights.forEach(n => {
+    if (!n.gameType) n.gameType = GAME_TYPES.find(g => n.blinds && g.startsWith(n.blinds)) || GAME_TYPES[0];
+    if (Array.isArray(n.nightExpenses)){ n.expense = (n.expense || 0) + n.nightExpenses.reduce((s,x) => s + x.amount, 0); n.expenseNote = n.expenseNote || n.nightExpenses.map(x => x.desc).join(', '); delete n.nightExpenses; }
+    n.expense ||= 0; n.housePlay ||= 0; n.expenseNote ||= ''; n.seats ||= 9;
+    n.rsvps ||= []; n.entries ||= [];
+  });
+  D.players.forEach(p => { if (p.prefSeat === undefined) p.prefSeat = 0; });
+  D.version = 2;
+}
+function load(){
+  try { const raw = localStorage.getItem(KEY); if (raw) D = Object.assign(blank(), JSON.parse(raw)); }
+  catch(e){ storageOK = false; }
+  migrate();
+}
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(D)); storageOK = true; }
+  catch(e){ storageOK = false; }
+}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const sum = (a,f) => a.reduce((s,x) => s + (f ? f(x) : x), 0);
+const toCents = v => { const n = parseFloat(String(v).replace(/[$,\s]/g,'')); return isFinite(n) ? Math.round(n*100) : NaN; };
+const money = (c, sign) => { const neg = c < 0; const s = '$' + (Math.abs(c)/100).toLocaleString('en-US',{minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits:2}); return neg ? '−' + s : (sign && c > 0 ? '+' + s : s); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+const fmtDate = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}); };
+const shortDate = iso => fmtDate(iso).replace(/, \d{4}$/,'');
+const fmtMonth = ym => { const [y,m] = ym.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'}); };
+const fmtTime = t => { if (!t) return ''; const [h,m] = t.split(':').map(Number); const d = new Date(); d.setHours(h,m); return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); };
+const player = id => D.players.find(p => p.id === id);
+const pname = id => player(id)?.name || 'Removed player';
+const night = id => D.nights.find(n => n.id === id);
+const rsvp = (n, pid) => n.rsvps.find(r => r.pid === pid);
+
+/* ---------- money math ---------- */
+// Entries per night: buyin, bpay (player paid house), cashout, cpay (house paid player).
+// A buy-in's unpaid part is "Settle at end": it shows as owed to house until the player cashes out.
+function playerLedger(n, pid){
+  const e = n.entries.filter(x => x.pid === pid);
+  const by = k => sum(e.filter(x => x.kind === k), x => x.amount);
+  const buyin = by('buyin'), bpaid = by('bpay'), cashout = by('cashout'), cpaid = by('cpay');
+  return { e, buyin, bpaid, cashout, cpaid, owesHouse: buyin - bpaid, houseOwes: cashout - cpaid, result: cashout - buyin,
+    buyins: e.filter(x => x.kind === 'buyin').length, checkedOut: e.some(x => x.kind === 'cashout') };
+}
+function nightPlayers(n){
+  const ids = n.rsvps.map(r => r.pid);
+  n.entries.forEach(x => { if (!ids.includes(x.pid)) ids.push(x.pid); });
+  const seatOf = id => { const s = rsvp(n, id)?.seat; return s && s <= n.seats ? s : 99; };
+  return ids.sort((a,b) => seatOf(a) - seatOf(b));
+}
+function nightTotals(n){
+  const L = nightPlayers(n).map(pid => playerLedger(n, pid));
+  const t = {
+    players: L.length,
+    buyin: sum(L, l => l.buyin), bpaid: sum(L, l => l.bpaid),
+    cashout: sum(L, l => l.cashout), cpaid: sum(L, l => l.cpaid),
+    owesHouse: sum(L, l => Math.max(0, l.owesHouse)),
+    houseOwes: sum(L, l => Math.max(0, l.houseOwes)),
+    rake: n.rake || 0, tips: n.tips || 0, nightExp: n.expense || 0, housePlay: n.housePlay || 0,
+  };
+  t.net = t.rake - t.tips - t.nightExp + t.housePlay;
+  t.chipCheck = t.buyin - t.cashout - t.rake - t.housePlay; // 0 when the table balances
+  t.byMethod = methodTotals(n.entries);
+  return t;
+}
+function methodTotals(entries){
+  const m = {};
+  entries.forEach(x => {
+    if ((x.kind !== 'bpay' && x.kind !== 'cpay') || x.method === NETTED) return;
+    const r = m[x.method] ||= { in:0, out:0 };
+    if (x.kind === 'bpay') r.in += x.amount; else r.out += x.amount;
+  });
+  return m;
+}
+function seating(n){
+  const rs = n.rsvps.map(r => ({...r, p: player(r.pid)})).filter(r => r.p);
+  const seated = rs.filter(r => r.seat && r.seat <= n.seats).sort((a,b) => a.seat - b.seat);
+  const waitlist = rs.filter(r => !(r.seat && r.seat <= n.seats)).sort((a,b) => (b.p.regular - a.p.regular) || (a.t - b.t));
+  return { seated, waitlist };
+}
+const takenSeats = (n, exceptPid) => n.rsvps.filter(r => r.pid !== exceptPid && r.seat && r.seat <= n.seats).map(r => r.seat);
+function colorOf(n, pid){
+  const s = rsvp(n, pid)?.seat;
+  const i = s ? s - 1 : nightPlayers(n).indexOf(pid);
+  const c = COLORS[(i < 0 ? 0 : i) % COLORS.length];
+  return `--pc:${c};--pcbg:${c}22;--pcline:${c}55`;
+}
+
+/* ---------- UI state ---------- */
+const UI = { locked:true, tab:'nights', nightId:null, nightTab:'money', month:null, report:'month', reportPlayer:null, entry:'' };
+const $app = document.getElementById('app');
+let sheetEl = null;
+
+function toast(msg){
+  document.querySelectorAll('.toast').forEach(x => x.remove());
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; t.setAttribute('role','status');
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+
+/* ---------- passcode ---------- */
+async function hash(s){
+  const salted = 'hgl:' + s;
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salted));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+  } catch(e){
+    let h = 2166136261; for (const c of salted) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return 'f' + (h>>>0).toString(16);
+  }
+}
+let setupFirst = null;
+function renderLock(){
+  const setting = !D.passHash;
+  const title = setting ? (setupFirst ? 'Confirm passcode' : 'Create a host passcode') : 'Enter passcode';
+  const sub = setting ? 'Six digits. Share it only with your partner.' : 'Host access only';
+  $app.innerHTML = `
+  <div class="lock"><div class="box">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="84" height="84" style="border-radius:20px;display:block" aria-hidden="true">   <defs>     <radialGradient id="bg" cx="50%" cy="38%" r="75%">       <stop offset="0" stop-color="#17463a"/>       <stop offset=".55" stop-color="#0e2a22"/>       <stop offset="1" stop-color="#08140f"/>     </radialGradient>     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">       <stop offset="0" stop-color="#f7d58b"/>       <stop offset=".5" stop-color="#e9b85b"/>       <stop offset="1" stop-color="#c38f35"/>     </linearGradient>     <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">       <stop offset="0" stop-color="#14382e"/>       <stop offset="1" stop-color="#0b2019"/>     </linearGradient>   </defs>   <rect width="84" height="84" style="border-radius:20px;display:block" aria-hidden="true" fill="url(#bg)"/>   <!-- chip shadow -->   <ellipse cx="512" cy="560" rx="330" ry="330" fill="#000" opacity=".35"/>   <!-- chip body -->   <circle cx="512" cy="512" r="330" fill="url(#gold)"/>   <!-- edge inserts -->   <g fill="#0e2a22">     <g id="ins"><path d="M512 182 L560 186 L554 262 L470 262 L464 186 Z"/></g>     <use href="#ins" transform="rotate(60 512 512)"/>     <use href="#ins" transform="rotate(120 512 512)"/>     <use href="#ins" transform="rotate(180 512 512)"/>     <use href="#ins" transform="rotate(240 512 512)"/>     <use href="#ins" transform="rotate(300 512 512)"/>   </g>   <!-- inner face -->   <circle cx="512" cy="512" r="236" fill="url(#face)"/>   <circle cx="512" cy="512" r="236" fill="none" stroke="url(#gold)" stroke-width="10"/>   <circle cx="512" cy="512" r="212" fill="none" stroke="#e9b85b" stroke-width="3" stroke-dasharray="6 14" opacity=".55"/>   <!-- spade -->   <path fill="url(#gold)" d="M512 352     C 470 410 384 452 384 530     C 384 584 426 618 470 618     C 488 618 500 612 506 604     C 502 640 488 664 452 680     L 572 680     C 536 664 522 640 518 604     C 524 612 536 618 554 618     C 598 618 640 584 640 530     C 640 452 554 410 512 352 Z"/> </svg> 
+    <h1>Home Game Ledger</h1>
+    <div><h2>${title}</h2><div class="muted small">${sub}</div></div>
+    <div class="dots" aria-label="${UI.entry.length} of 6 digits entered">${[0,1,2,3,4,5].map(i => `<i class="${i < UI.entry.length ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="err" id="lockErr" aria-live="polite"></div>
+    <div class="pad">${[1,2,3,4,5,6,7,8,9].map(d => `<button data-key="${d}">${d}</button>`).join('')}
+      <button data-key="clr" aria-label="Clear" style="font-size:.9rem">Clear</button><button data-key="0">0</button><button data-key="del" aria-label="Delete">⌫</button></div>
+    ${setting ? '' : '<button class="btn ghost sm" data-act="forgot">Forgot passcode</button>'}
+  </div></div>`;
+}
+async function keyPress(k){
+  if (k === 'del') UI.entry = UI.entry.slice(0,-1);
+  else if (k === 'clr') UI.entry = '';
+  else if (UI.entry.length < 6) UI.entry += k;
+  renderLock();
+  if (UI.entry.length < 6) return;
+  const code = UI.entry; UI.entry = '';
+  if (!D.passHash){
+    if (!setupFirst){ setupFirst = code; renderLock(); return; }
+    if (setupFirst !== code){ setupFirst = null; renderLock(); document.getElementById('lockErr').textContent = 'Passcodes did not match. Start again.'; return; }
+    D.passHash = await hash(code); setupFirst = null; save(); UI.locked = false; render(); toast('Passcode set'); return;
+  }
+  if (await hash(code) === D.passHash){ UI.locked = false; render(); }
+  else { renderLock(); document.getElementById('lockErr').textContent = 'Wrong passcode. Try again.'; }
+}
+
+/* ---------- icons ---------- */
+const ICON = {
+  nights:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>',
+  players:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.5 14.5c2.5.2 4.3 1.8 5 4.5"/></svg>',
+  expenses:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+  reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  back:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg>',
+};
+
+/* ---------- render ---------- */
+function render(){
+  if (UI.locked) return renderLock();
+  let head = '', body = '';
+  if (UI.tab === 'nights' && UI.nightId && night(UI.nightId)) [head, body] = viewNight(night(UI.nightId));
+  else if (UI.tab === 'nights') [head, body] = viewNights();
+  else if (UI.tab === 'players') [head, body] = viewPlayers();
+  else if (UI.tab === 'expenses') [head, body] = viewExpenses();
+  else if (UI.tab === 'reports') [head, body] = viewReports();
+  else [head, body] = viewSettings();
+  const warn = storageOK ? '' : `<div class="card owes-house small">This browser is not saving data right now. Copy a backup from Settings before closing.</div>`;
+  const tab = (k, label) => `<button data-tab="${k}" aria-current="${UI.tab === k}">${ICON[k]}${label}</button>`;
+  $app.innerHTML = `<header class="top">${head}</header><main>${warn}${body}</main>
+    <nav class="tabs"><div class="in">${tab('nights','Nights')}${tab('players','Players')}${tab('expenses','Expenses')}${tab('reports','Reports')}${tab('settings','Settings')}</div></nav>`;
+}
+
+function viewNights(){
+  const list = [...D.nights].sort((a,b) => (b.date + b.start).localeCompare(a.date + a.start));
+  const head = `<div class="grow"><h1>Game Nights</h1><div class="sub">${list.length ? list.length + ' recorded' : 'No nights yet'}</div></div><button class="btn sm" data-act="newNight">+ New night</button>`;
+  if (!list.length) return [head, `<div class="card empty"><div class="suits">♠♥♦♣</div><div><h2>Set up your first game night</h2><p class="small">Enter the date, start time, location, game type and house rules. Then check players in and record rebuys and cash-outs as the night goes.</p></div><button class="btn" data-act="newNight">Set up a game night</button></div>`];
+  const body = list.map(n => {
+    const t = nightTotals(n);
+    return `<button class="card tap stack" data-open-night="${n.id}">
+      <div class="split"><h3>${esc(fmtDate(n.date))}</h3><span class="pill ${n.status}">${n.status === 'open' ? 'Live' : 'Closed'}</span></div>
+      <div class="small"><b style="color:var(--gold-hi)">${esc(n.gameType)}</b><span class="muted"> · ${esc([fmtTime(n.start), n.location, n.seats + ' seats'].filter(Boolean).join(' · '))}</span></div>
+      <div class="row small num">
+        <span>${t.players} players</span><span class="muted">·</span><span>In ${money(t.buyin)}</span><span class="muted">·</span><span>Out ${money(t.cashout)}</span>
+      </div>
+      ${(t.owesHouse || t.houseOwes) ? `<div class="row small num">${t.owesHouse ? `<span class="owes-house">Owed to house ${money(t.owesHouse)}</span>` : ''}${t.houseOwes ? `<span class="owes-player">House owes players ${money(t.houseOwes)}</span>` : ''}</div>` : ''}
+      ${n.status === 'closed' ? `<div class="small num">House net <b class="${t.net >= 0 ? 'win' : 'loss'}">${money(t.net)}</b></div>` : ''}
+    </button>`;
+  }).join('');
+  return [head, body];
+}
+
+function viewNight(n){
+  const head = `<button class="iconbtn" data-act="backNights" aria-label="All nights">${ICON.back}</button>
+    <div class="grow"><h1>${esc(fmtDate(n.date))}</h1><div class="sub">${esc([n.gameType, fmtTime(n.start), n.location].filter(Boolean).join(' · '))}</div></div>
+    <span class="pill ${n.status}">${n.status === 'open' ? 'Live' : 'Closed'}</span>`;
+  const seg = (k, l) => `<button data-night-tab="${k}" aria-pressed="${UI.nightTab === k}">${l}</button>`;
+  let body = `<div class="segs">${seg('money','Money')}${seg('seats','Seats')}${seg('close','Settle')}${seg('info','Details')}</div>`;
+  if (UI.nightTab === 'seats') body += nightSeats(n);
+  else if (UI.nightTab === 'close') body += nightClose(n);
+  else if (UI.nightTab === 'info') body += nightInfo(n);
+  else body += nightMoney(n);
+  return [head, body];
+}
+
+function methodTable(byMethod){
+  const rows = Object.entries(byMethod).sort((a,b) => (b[1].in + b[1].out) - (a[1].in + a[1].out));
+  if (!rows.length) return '<div class="small muted">No money has changed hands yet.</div>';
+  const tin = sum(rows, r => r[1].in), tout = sum(rows, r => r[1].out);
+  return `<div class="tablewrap"><table><thead><tr><th>Method</th><th>Collected</th><th>Paid out</th><th>Net</th></tr></thead><tbody>
+    ${rows.map(([m,v]) => `<tr><td>${esc(m)}</td><td>${money(v.in)}</td><td>${money(v.out)}</td><td class="${v.in - v.out >= 0 ? 'win' : 'loss'}"><b>${money(v.in - v.out)}</b></td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td><b>${money(tin)}</b></td><td><b>${money(tout)}</b></td><td class="${tin - tout >= 0 ? 'win' : 'loss'}"><b>${money(tin - tout)}</b></td></tr>
+  </tbody></table></div>`;
+}
+
+function nightMoney(n){
+  const t = nightTotals(n);
+  const ids = nightPlayers(n);
+  let html = `<div class="card stack">
+    <div class="stat">
+      <div><div class="label">Buy-ins</div><div class="v">${money(t.buyin)}</div></div>
+      <div><div class="label">Cash-outs</div><div class="v">${money(t.cashout)}</div></div>
+      <div><div class="label">Owed to house</div><div class="v owes-house">${money(t.owesHouse)}</div><div class="small muted">Settle at end</div></div>
+      <div><div class="label">House owes players</div><div class="v owes-player">${money(t.houseOwes)}</div><div class="small muted">Unpaid cash-outs</div></div>
+    </div>
+    <h3>By payment method</h3>${methodTable(t.byMethod)}
+  </div>
+  <button class="btn block" data-act="checkin">+ Check in player</button>`;
+  if (!ids.length) html += `<div class="card empty"><div>Nobody checked in yet.</div><div class="small">Tap Check in player to pick someone from your roster, give them a seat and record their buy-in.</div></div>`;
+  html += ids.map(pid => playerCard(n, pid)).join('');
+  return html;
+}
+
+function playerCard(n, pid){
+  const l = playerLedger(n, pid);
+  const r = rsvp(n, pid);
+  const seat = r?.seat && r.seat <= n.seats ? r.seat : null;
+  const p = player(pid);
+  const paidBy = Object.entries(methodTotals(l.e.filter(x => x.kind === 'bpay'))).map(([m,v]) => `${esc(m)} ${money(v.in)}`).join(' · ');
+  const outBy = Object.entries(methodTotals(l.e.filter(x => x.kind === 'cpay'))).map(([m,v]) => `${esc(m)} ${money(v.out)}`).join(' · ');
+  const netted = sum(l.e.filter(x => x.kind === 'cpay' && x.method === NETTED), x => x.amount);
+  let status;
+  if (!l.checkedOut){
+    status = !l.buyin ? '<span class="muted">Seated, no buy-in yet</span>'
+      : l.owesHouse > 0 ? `<span class="owes-house"><span class="dot"></span>Settle at end · owes house ${money(l.owesHouse)}</span>`
+      : '<span class="in"><span class="dot"></span>Playing · buy-in paid</span>';
+  } else {
+    status = l.houseOwes > 0 ? `<span class="owes-player"><span class="dot"></span>Checked out · house owes ${money(l.houseOwes)}</span>`
+      : l.owesHouse > 0 ? `<span class="owes-house"><span class="dot"></span>Checked out · still owes ${money(l.owesHouse)}</span>`
+      : '<span class="muted"><span class="dot"></span>Checked out · settled</span>';
+  }
+  const hist = l.e.slice().sort((a,b) => a.t - b.t).map(x => {
+    const what = { buyin: 'Buy-in', bpay:'Player paid', cashout:'Cash-out (chips)', cpay:'House paid' }[x.kind];
+    const time = new Date(x.t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    return `<div class="h"><span>${what}${x.method ? ' · ' + esc(x.method) : ''} <span class="muted">${time}</span></span><span class="num">${money(x.amount)} <button data-del-entry="${x.id}" aria-label="Delete this line">✕</button></span></div>`;
+  }).join('');
+  const btns = [
+    !l.checkedOut ? `<button class="btn ghost" data-act="rebuy" data-pid="${pid}">${l.buyin ? 'Rebuy' : 'Buy in'}</button>` : '',
+    !l.checkedOut && l.buyin ? `<button class="btn ghost" data-act="cashout" data-pid="${pid}">Cash Out</button>` : '',
+    l.checkedOut && l.houseOwes > 0 ? `<button class="btn ghost" data-act="paybalance" data-pid="${pid}">Pay balance</button>` : '',
+    l.checkedOut && l.owesHouse > 0 ? `<button class="btn ghost" data-act="collect" data-pid="${pid}">Collect balance</button>` : '',
+    `<button class="btn ghost" data-act="notes" data-pid="${pid}">Notes</button>`].join('');
+  return `<div class="card player" style="${colorOf(n, pid)}">
+    <div class="split">
+      <button class="namebtn" data-player-night="${pid}" aria-label="Edit ${esc(pname(pid))}">${seat ? `<span class="seat">${seat}</span>` : '<span class="seat open">–</span>'}<h2>${esc(pname(pid))}</h2></button>
+      ${!seat ? '<span class="pill wait">Waitlist</span>' : p?.regular ? '<span class="pill reg">Regular</span>' : ''}
+    </div>
+    <div class="minis num">
+      <div><div class="label">Buy-in${l.buyins > 1 ? 's ×' + l.buyins : ''}</div><div class="v">${money(l.buyin)}</div></div>
+      <div><div class="label">Paid in</div><div class="v ${l.bpaid ? 'in' : ''}">${money(l.bpaid - netted)}</div></div>
+      <div><div class="label">Cash-out</div><div class="v">${l.checkedOut ? money(l.cashout) : '—'}</div></div>
+    </div>
+    <div class="stack" style="gap:3px">
+      <div class="statusline">${status}</div>
+      ${paidBy ? `<div class="paidby">In: ${paidBy}</div>` : ''}
+      ${l.checkedOut && (outBy || netted) ? `<div class="paidby">Out: ${[netted ? 'netted against balance ' + money(netted) : '', outBy].filter(Boolean).join(' · ')}</div>` : ''}
+      ${r?.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}
+    </div>
+    <div class="actions">${btns}</div>
+    ${l.e.length ? `<details><summary class="small muted">History (${l.e.length})</summary><div class="history">${hist}</div></details>` : ''}
+  </div>`;
+}
+function nightSeats(n){
+  const { seated, waitlist } = seating(n);
+  const bySeat = {}; seated.forEach(r => bySeat[r.seat] = r);
+  const rows = Array.from({ length: n.seats }, (_, i) => {
+    const s = i + 1, r = bySeat[s];
+    if (!r) return `<button class="seatrow" data-act="checkin" data-seat="${s}"><span class="seat open">${s}</span><span class="grow muted">Open seat</span><span class="small" style="color:var(--gold-hi)">+ Seat a player</span></button>`;
+    const l = playerLedger(n, r.pid);
+    return `<button class="seatrow filled" style="${colorOf(n, r.pid)}" data-player-night="${r.pid}"><span class="seat">${s}</span><span class="grow"><b>${esc(r.p.name)}</b> ${r.p.regular ? '<span class="pill reg">Regular</span>' : ''}</span><span class="small num muted">${l.checkedOut ? 'Out' : l.buyin ? money(l.buyin) : ''}</span></button>`;
+  }).join('');
+  return `<div class="card stack">
+    <div class="split"><h2>Table</h2><button class="btn sm ghost" data-act="seatCount">${n.seats} seats ▾</button></div>
+    <div class="seatgrid">${rows}</div>
+  </div>
+  <div class="card stack"><h2>Waitlist</h2>
+    <div class="small muted">Regulars move to the top of the waitlist.</div>
+    ${waitlist.length ? waitlist.map((r,i) => `<div class="row"><span class="num muted" style="width:1.4em">${i+1}</span><span class="grow">${esc(r.p.name)} ${r.p.regular ? '<span class="pill reg">Regular</span>' : ''}</span><button class="btn sm ghost" data-player-night="${r.pid}">Seat</button></div>`).join('') : '<div class="small muted">Nobody waiting.</div>'}
+    <button class="btn sm ghost" data-act="checkin" data-wait="1">+ Add to waitlist</button>
+  </div>`;
+}
+
+function nightClose(n){
+  const t = nightTotals(n);
+  const hp = n.housePlay || 0;
+  const msel = (id, v) => `<select id="${id}" aria-label="Paid with">${METHODS.map(m => `<option ${m === (v || 'Cash') ? 'selected' : ''}>${m}</option>`).join('')}</select>`;
+  const form = `<form id="closeForm" class="stack">
+  <div class="split"><h2>Rake, tips &amp; costs</h2></div>
+  <div class="closegrid">
+    <div class="card"><h3>Rake</h3><div class="field"><label for="rake">Total for the night</label><input id="rake" inputmode="decimal" placeholder="0" value="${n.rake ? n.rake/100 : ''}"></div></div>
+    <div class="card"><h3>Dealer tips</h3><div class="field"><label for="tips">Total tips</label><input id="tips" inputmode="decimal" placeholder="0" value="${n.tips ? n.tips/100 : ''}"></div>
+      <div class="field"><label for="tipsM">Paid with</label>${msel('tipsM', n.tipsMethod)}</div></div>
+    <div class="card"><h3>Tonight's expenses</h3><div class="field"><label for="nexp">Food, drinks, etc.</label><input id="nexp" inputmode="decimal" placeholder="0" value="${n.expense ? n.expense/100 : ''}"></div>
+      <div class="field"><label for="nexpNote">What for</label><input id="nexpNote" placeholder="Pizza" value="${esc(n.expenseNote)}"></div>
+      <div class="field"><label for="nexpM">Paid with</label>${msel('nexpM', n.expenseMethod)}</div></div>
+    <div class="card"><h3>House play</h3>
+      <input type="hidden" id="hpSign" value="${hp < 0 ? '-' : '+'}">
+      <div class="segs" id="hpSeg"><button type="button" data-hp="+" aria-pressed="${hp >= 0}">Won</button><button type="button" data-hp="-" aria-pressed="${hp < 0}">Lost</button></div>
+      <div class="field"><label for="hp">How you did playing</label><input id="hp" inputmode="decimal" placeholder="0" value="${hp ? Math.abs(hp)/100 : ''}"></div></div>
+  </div>
+  <button class="btn ghost" type="submit">Save and update settlement</button>
+  </form>`;
+  const card = settlementCard(n, t);
+  return `${n.status === 'open' ? form + card : card + form}
+  ${n.status === 'open'
+    ? `<button class="btn block" data-act="closeNight">Close the night</button>`
+    : `<button class="btn ghost block" data-act="reopenNight">Reopen night</button>`}`;
+}
+
+// End-of-night settlement: what should be in hand per payment method, who is still owed, and whether the table balances.
+function settlement(n){
+  const t = nightTotals(n);
+  const m = {};
+  const row = k => m[k] ||= { in:0, out:0, tips:0, exp:0 };
+  Object.entries(t.byMethod).forEach(([k,v]) => { row(k).in += v.in; row(k).out += v.out; });
+  if (t.tips) row(n.tipsMethod || 'Cash').tips += t.tips;
+  if (t.nightExp) row(n.expenseMethod || 'Cash').exp += t.nightExp;
+  Object.values(m).forEach(r => r.have = r.in - r.out - r.tips - r.exp);
+  const L = nightPlayers(n).map(pid => [pid, playerLedger(n, pid)]);
+  const nettedIn = sum(n.entries.filter(x => x.kind === 'bpay' && x.method === NETTED), x => x.amount);
+  const nettedOut = sum(n.entries.filter(x => x.kind === 'cpay' && x.method === NETTED), x => x.amount);
+  const collected = sum(Object.values(t.byMethod), v => v.in), paidOut = sum(Object.values(t.byMethod), v => v.out);
+  const expectedDiff = t.rake + t.housePlay;
+  return { t, m, owedToHouse: L.filter(([,l]) => l.owesHouse > 0), houseOwes: L.filter(([,l]) => l.houseOwes > 0),
+    stillPlaying: L.filter(([,l]) => l.buyin && !l.checkedOut).map(([pid]) => pid),
+    nettedIn, nettedOut, collected, paidOut, expectedDiff, off: (t.buyin - t.cashout) - expectedDiff,
+    cashHave: m.Cash ? m.Cash.have : 0 };
+}
+function settlementCard(n){
+  const s = settlement(n), t = s.t;
+  const rows = Object.entries(s.m).sort((a,b) => (a[0] === 'Cash' ? -1 : b[0] === 'Cash' ? 1 : Math.abs(b[1].have) - Math.abs(a[1].have)));
+  const counted = n.cashCounted;
+  const diff = counted == null ? null : counted - s.cashHave;
+  return `<div class="card settle">
+    <div class="split"><h2>Night settlement</h2><span class="pill ${n.status}">${n.status === 'open' ? 'Live' : 'Closed'}</span></div>
+    ${s.stillPlaying.length ? `<div class="badge warn">Still playing: ${esc(s.stillPlaying.map(pname).join(', '))}. Cash them out to finish the settlement.</div>` : ''}
+    <div class="hero">
+      <div class="label">Cash you should have</div>
+      <div class="big ${s.cashHave < 0 ? 'out' : ''}">${money(s.cashHave)}</div>
+      <div class="grid2" style="align-items:end;margin-top:6px">
+        <div class="field"><label for="cashCount">Cash you counted</label><input id="cashCount" inputmode="decimal" placeholder="Count the drawer" value="${counted == null ? '' : counted/100}"></div>
+        <div>${diff == null ? '<div class="small muted">Enter the count to check it.</div>' : diff === 0 ? '<div class="badge ok">Cash matches</div>' : `<div class="badge warn">${diff > 0 ? 'Over' : 'Short'} by ${money(Math.abs(diff))}</div>`}</div>
+      </div>
+    </div>
+    <div>
+      <h3>Each payment method</h3>
+      ${rows.length ? rows.map(([k,r]) => `<div class="methodrow"><span class="m">${esc(k)}</span><span class="amt ${r.have < 0 ? 'out' : 'in'}">${money(r.have)}</span>
+        <span class="calc">${[`in ${money(r.in)}`, r.out ? `paid out ${money(r.out)}` : '', r.tips ? `tips ${money(r.tips)}` : '', r.exp ? `expenses ${money(r.exp)}` : ''].filter(Boolean).join(' − ')}</span></div>`).join('')
+        : '<div class="small muted">No money has changed hands yet.</div>'}
+      ${rows.length ? `<div class="methodrow"><span class="m">Total in hand</span><span class="amt">${money(sum(rows, ([,r]) => r.have))}</span></div>` : ''}
+    </div>
+    <div class="grid2" style="gap:10px">
+      <div class="stack" style="gap:6px"><h3 class="owes-house">Owed to the house</h3>
+        ${s.owedToHouse.length ? `<div class="owelist">${s.owedToHouse.map(([pid,l]) => `<div class="o"><span>${esc(pname(pid))}</span><b class="owes-house num">${money(l.owesHouse)}</b></div>`).join('')}</div>` : '<div class="small muted">Nobody</div>'}</div>
+      <div class="stack" style="gap:6px"><h3 class="owes-player">House owes</h3>
+        ${s.houseOwes.length ? `<div class="owelist">${s.houseOwes.map(([pid,l]) => `<div class="o"><span>${esc(pname(pid))}</span><b class="owes-player num">${money(l.houseOwes)}</b></div>`).join('')}</div>` : '<div class="small muted">Nobody</div>'}</div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:8px">Intake vs. output</h3>
+      <div class="flow num">
+        <div><div class="head"><span>Buy-ins</span><span>${money(t.buyin)}</span></div>
+          <div class="line"><span class="muted">Collected</span><span class="in">${money(s.collected)}</span></div>
+          <div class="line"><span class="muted">Netted at cash-out</span><span>${money(s.nettedIn)}</span></div>
+          <div class="line"><span class="muted">Still owed</span><span class="owes-house">${money(t.owesHouse)}</span></div></div>
+        <div><div class="head"><span>Cash-outs</span><span>${money(t.cashout)}</span></div>
+          <div class="line"><span class="muted">Paid out</span><span class="out">${money(s.paidOut)}</span></div>
+          <div class="line"><span class="muted">Netted vs. balance</span><span>${money(s.nettedOut)}</span></div>
+          <div class="line"><span class="muted">House still owes</span><span class="owes-player">${money(t.houseOwes)}</span></div></div>
+      </div>
+    </div>
+    <div class="kv num">
+      <span>Buy-ins − cash-outs</span><span class="v">${money(t.buyin - t.cashout)}</span>
+      <span>Rake${t.housePlay ? ' + house play' : ''}</span><span class="v">${money(s.expectedDiff)}</span>
+    </div>
+    ${s.off === 0 ? '<div class="badge ok">Table balances</div>' : `<div class="badge warn">Off by ${money(Math.abs(s.off))}. ${s.stillPlaying.length ? 'Some players have not cashed out yet.' : 'Check for a missing rebuy, cash-out or rake amount.'}</div>`}
+    <div class="kv num">
+      <span>Rake</span><span class="v">${money(t.rake)}</span>
+      <span>Dealer tips</span><span class="v">−${money(t.tips)}</span>
+      <span>Tonight's expenses</span><span class="v">−${money(t.nightExp)}</span>
+      <span>House play</span><span class="v ${t.housePlay >= 0 ? 'win' : 'loss'}">${money(t.housePlay, true)}</span>
+      <span class="total"><b>House net tonight</b></span><span class="v total net ${t.net >= 0 ? 'win' : 'loss'}">${money(t.net)}</span>
+    </div>
+  </div>`;
+}
+function nightInfo(n){
+  return `<form class="card stack" id="nightForm">${nightFields(n)}<button class="btn" type="submit">Save details</button></form>
+    <button class="btn danger block" data-act="deleteNight">Delete this night</button>`;
+}
+function nightFields(n){
+  n = n || { date: todayISO(), start:'19:00', location:'', gameType: GAME_TYPES[0], rules:'', seats:9 };
+  return `<div class="grid2">
+      <div class="field"><label for="nDate">Date</label><input id="nDate" type="date" required value="${esc(n.date)}" data-nofocus="1"></div>
+      <div class="field"><label for="nStart">Start time</label><input id="nStart" type="time" value="${esc(n.start)}"></div>
+    </div>
+    <div class="field"><label for="nLoc">Location</label><input id="nLoc" value="${esc(n.location)}" placeholder="My place"></div>
+    <div class="grid2">
+      <div class="field"><label for="nGame">Game type</label><select id="nGame">${GAME_TYPES.map(g => `<option ${g === n.gameType ? 'selected' : ''}>${g}</option>`).join('')}</select></div>
+      <div class="field"><label for="nSeats">Seats</label><select id="nSeats">${[2,3,4,5,6,7,8,9,10].map(s => `<option ${s === n.seats ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label for="nRules">House rules</label><textarea id="nRules" placeholder="Min buy-in $300, max $1,000. Rebuys allowed until midnight.">${esc(n.rules)}</textarea></div>`;
+}
+function readNightFields(){
+  const v = id => document.getElementById(id).value.trim();
+  return { date: v('nDate') || todayISO(), start: v('nStart'), location: v('nLoc'), gameType: v('nGame'), rules: v('nRules'), seats: parseInt(v('nSeats')) || 9 };
+}
+
+function viewPlayers(){
+  const ps = [...D.players].sort((a,b) => (b.regular - a.regular) || a.name.localeCompare(b.name));
+  const head = `<div class="grow"><h1>Roster</h1><div class="sub num">${ps.length} of ${MAX_PLAYERS} players · ${ps.filter(p => p.regular).length} regulars</div></div>
+    <button class="btn sm" data-act="newPlayer" ${ps.length >= MAX_PLAYERS ? 'disabled' : ''}>+ Player</button>`;
+  if (!ps.length) return [head, `<div class="card empty"><div class="suits">♠♥♦♣</div><div><h2>Build your roster</h2><p class="small">Create a profile for each player, up to 40. Mark regulars so they move up the waitlist, and set a preferred seat.</p></div><button class="btn" data-act="newPlayer">Add a player</button></div>`];
+  return [head, ps.map(p => {
+    const nights = D.nights.filter(n => n.entries.some(e => e.pid === p.id));
+    return `<button class="card tap" data-edit-player="${p.id}"><div class="row"><span class="grow"><b>${esc(p.name)}</b> ${p.regular ? '<span class="pill reg">Regular</span>' : ''}<div class="small muted">${esc([p.prefSeat ? 'Prefers seat ' + p.prefSeat : '', p.phone, p.notes].filter(Boolean).join(' · ') || ' ')}</div></span>
+      <span class="small num muted" style="text-align:right">${nights.length} night${nights.length === 1 ? '' : 's'}</span></div></button>`;
+  }).join('')];
+}
+
+function viewExpenses(){
+  const list = [...D.expenses].sort((a,b) => b.date.localeCompare(a.date));
+  const head = `<div class="grow"><h1>Monthly Expenses</h1><div class="sub">Costs not tied to one night</div></div><button class="btn sm" data-act="newExpense">+ Expense</button>`;
+  if (!list.length) return [head, `<div class="card empty"><div><h2>No monthly expenses yet</h2><p class="small">Record rent, new cards, chips or anything else that isn't part of one night.</p></div><button class="btn" data-act="newExpense">Add an expense</button></div>`];
+  const months = [...new Set(list.map(x => x.date.slice(0,7)))];
+  return [head, months.map(m => {
+    const items = list.filter(x => x.date.startsWith(m));
+    return `<div class="card stack"><div class="split"><h2>${fmtMonth(m)}</h2><b class="num">${money(sum(items, x => x.amount))}</b></div>
+      ${items.map(x => `<button class="row tap" style="background:none;border:0;padding:6px 0;border-top:1px solid var(--line);text-align:left;cursor:pointer;color:var(--ink)" data-edit-expense="${x.id}">
+        <span class="grow"><b>${esc(x.desc || x.category)}</b><div class="small muted">${esc(fmtDate(x.date))} · ${esc(x.category)} · ${esc(x.method)}</div></span><b class="num">${money(x.amount)}</b></button>`).join('')}
+    </div>`;
+  }).join('')];
+}
+
+function viewReports(){
+  const head = `<div class="grow"><h1>Reports</h1><div class="sub">${UI.report === 'players' ? 'Player results across all nights' : 'Night by night and monthly totals'}</div></div>`;
+  const seg = (k, l) => `<button data-report="${k}" aria-pressed="${UI.report === k}">${l}</button>`;
+  const segs = `<div class="segs">${seg('month','Monthly')}${seg('players','Players')}</div>`;
+  return [head, segs + (UI.report === 'players' ? playerReports() : monthReport())];
+}
+function monthReport(){
+  const months = [...new Set([...D.nights.map(n => n.date.slice(0,7)), ...D.expenses.map(x => x.date.slice(0,7))])].sort().reverse();
+  if (!UI.month || !months.includes(UI.month)) UI.month = months[0] || todayISO().slice(0,7);
+  if (!months.length) return `<div class="card empty"><div><h2>Nothing to report yet</h2><p class="small">Reports fill in once you record a game night or a monthly expense.</p></div></div>`;
+  const nights = D.nights.filter(n => n.date.startsWith(UI.month)).sort((a,b) => a.date.localeCompare(b.date));
+  const T = nights.map(n => [n, nightTotals(n)]);
+  const tot = k => sum(T, ([,t]) => t[k]);
+  const mexp = D.expenses.filter(x => x.date.startsWith(UI.month));
+  const mexpTotal = sum(mexp, x => x.amount);
+  const byCat = {}; mexp.forEach(x => byCat[x.category] = (byCat[x.category] || 0) + x.amount);
+  const nightNet = tot('net'), hp = tot('housePlay');
+  return `
+  <div class="field"><label for="monthSel">Month</label><select id="monthSel">${months.map(m => `<option value="${m}" ${m === UI.month ? 'selected' : ''}>${fmtMonth(m)}</option>`).join('')}</select></div>
+  <div class="card stack"><h2>${fmtMonth(UI.month)}</h2>
+    <div class="kv num">
+      <span>Game nights</span><span class="v">${nights.length}</span>
+      <span>Buy-ins</span><span class="v">${money(tot('buyin'))}</span>
+      <span>Cash-outs</span><span class="v">${money(tot('cashout'))}</span>
+      <span class="owes-house">Unpaid: owed to house</span><span class="v owes-house">${money(tot('owesHouse'))}</span>
+      <span class="owes-player">Unpaid: house owes players</span><span class="v owes-player">${money(tot('houseOwes'))}</span>
+      <span>Rake</span><span class="v">${money(tot('rake'))}</span>
+      <span>Dealer tips</span><span class="v">−${money(tot('tips'))}</span>
+      <span>Night expenses</span><span class="v">−${money(tot('nightExp'))}</span>
+      <span>House play</span><span class="v ${hp >= 0 ? 'win' : 'loss'}">${money(hp, true)}</span>
+      <span class="total"><b>Nightly house net</b></span><span class="v total ${nightNet >= 0 ? 'win' : 'loss'}">${money(nightNet)}</span>
+    </div>
+    <div class="small muted">Unpaid amounts stay with the night they came from. See each night below.</div>
+  </div>
+  <div class="card stack"><div class="split"><h2>Monthly expenses</h2><b class="num">${money(mexpTotal)}</b></div>
+    ${mexp.length ? `<div class="kv num">${Object.entries(byCat).map(([c,a]) => `<span>${esc(c)}</span><span class="v">${money(a)}</span>`).join('')}</div>` : '<div class="small muted">None recorded this month.</div>'}
+    <hr><div class="kv num"><span>Nightly house net</span><span class="v">${money(nightNet)}</span><span>Monthly expenses</span><span class="v">−${money(mexpTotal)}</span>
+    <span class="total"><b>After monthly expenses</b></span><span class="v total ${(nightNet - mexpTotal) >= 0 ? 'win' : 'loss'}">${money(nightNet - mexpTotal)}</span></div>
+  </div>
+  <div class="card stack"><h2>Payment methods this month</h2>${methodTable(methodTotals(nights.flatMap(n => n.entries)))}</div>
+  <div class="card stack"><h2>Night by night</h2>
+    ${nights.length ? `<div class="tablewrap"><table><thead><tr><th>Night</th><th>Buy-ins</th><th>Cash-outs</th><th>Owed to house</th><th>House owes</th><th>Rake</th><th>Tips</th><th>Exp.</th><th>House play</th><th>Net</th></tr></thead><tbody>
+      ${T.map(([n,t]) => `<tr data-open-night="${n.id}" style="cursor:pointer"><td>${esc(shortDate(n.date))}</td><td>${money(t.buyin)}</td><td>${money(t.cashout)}</td><td class="owes-house">${money(t.owesHouse)}</td><td class="owes-player">${money(t.houseOwes)}</td><td>${money(t.rake)}</td><td>${money(t.tips)}</td><td>${money(t.nightExp)}</td><td>${money(t.housePlay, true)}</td><td class="${t.net >= 0 ? 'win' : 'loss'}"><b>${money(t.net)}</b></td></tr>`).join('')}
+    </tbody></table></div><div class="small muted">Tap a night to open it. Scroll the table sideways for more columns.</div>` : '<div class="small muted">No game nights this month.</div>'}
+  </div>
+  ${T.map(([n,t]) => nightReportCard(n,t)).join('')}`;
+}
+function nightReportCard(n, t){
+  const rows = nightPlayers(n).map(pid => [pid, playerLedger(n, pid)]).filter(([,l]) => l.e.length);
+  return `<div class="card stack"><div class="split"><h3>${esc(fmtDate(n.date))}</h3><span class="small muted">${esc(n.gameType)}</span></div>
+    <div class="tablewrap"><table><thead><tr><th>Player</th><th>Buy-in</th><th>Cash-out</th><th>Result</th><th>Unpaid</th></tr></thead><tbody>
+    ${rows.map(([pid,l]) => `<tr><td>${esc(pname(pid))}</td><td>${money(l.buyin)}</td><td>${l.checkedOut ? money(l.cashout) : '—'}</td><td class="${l.result >= 0 ? 'win' : 'loss'}">${l.checkedOut ? money(l.result, true) : '—'}</td><td>${l.owesHouse > 0 ? `<span class="owes-house">owes ${money(l.owesHouse)}</span>` : l.houseOwes > 0 ? `<span class="owes-player">owed ${money(l.houseOwes)}</span>` : '—'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No players</td></tr>'}
+    </tbody></table></div>
+    ${(() => { const s = settlement(n); return `<div class="small num">Cash in hand ${money(s.cashHave)} · owed to house <span class="owes-house">${money(t.owesHouse)}</span> · house owes <span class="owes-player">${money(t.houseOwes)}</span></div>`; })()}
+    <div class="small num">Rake ${money(t.rake)} − tips ${money(t.tips)} − expenses ${money(t.nightExp)} ${t.housePlay < 0 ? '−' : '+'} house play ${money(Math.abs(t.housePlay))} = <b class="${t.net >= 0 ? 'win' : 'loss'}">house net ${money(t.net)}</b></div>
+  </div>`;
+}
+function playerStats(pid){
+  const nights = D.nights.filter(n => n.entries.some(e => e.pid === pid)).sort((a,b) => b.date.localeCompare(a.date));
+  const rows = nights.map(n => [n, playerLedger(n, pid)]);
+  const done = rows.filter(([,l]) => l.checkedOut);
+  return { rows, nights: rows.length, buyin: sum(rows, ([,l]) => l.buyin), cashout: sum(rows, ([,l]) => l.cashout), result: sum(done, ([,l]) => l.result),
+    best: done.length ? Math.max(...done.map(([,l]) => l.result)) : 0, worst: done.length ? Math.min(...done.map(([,l]) => l.result)) : 0,
+    owes: sum(rows, ([,l]) => Math.max(0, l.owesHouse)), owed: sum(rows, ([,l]) => Math.max(0, l.houseOwes)) };
+}
+function playerReports(){
+  const list = D.players.map(p => [p, playerStats(p.id)]).filter(([,s]) => s.nights).sort((a,b) => b[1].result - a[1].result);
+  if (!list.length) return `<div class="card empty"><div><h2>No player history yet</h2><p class="small">Player results appear here after their first cash-out.</p></div></div>`;
+  if (!UI.reportPlayer || !list.some(([p]) => p.id === UI.reportPlayer)) UI.reportPlayer = list[0][0].id;
+  const [p, s] = list.find(([p]) => p.id === UI.reportPlayer);
+  return `<div class="card stack"><h2>All players</h2>
+    <div class="tablewrap"><table><thead><tr><th>Player</th><th>Nights</th><th>Buy-ins</th><th>Cash-outs</th><th>Result</th></tr></thead><tbody>
+    ${list.map(([p,s]) => `<tr data-report-player="${p.id}" style="cursor:pointer"><td>${p.id === UI.reportPlayer ? '▸ ' : ''}${esc(p.name)}</td><td>${s.nights}</td><td>${money(s.buyin)}</td><td>${money(s.cashout)}</td><td class="${s.result >= 0 ? 'win' : 'loss'}"><b>${money(s.result, true)}</b></td></tr>`).join('')}
+    </tbody></table></div><div class="small muted">Tap a player for their night-by-night history.</div></div>
+  <div class="card stack"><div class="split"><h2>${esc(p.name)}</h2>${p.regular ? '<span class="pill reg">Regular</span>' : ''}</div>
+    <div class="stat">
+      <div><div class="label">Overall result</div><div class="v ${s.result >= 0 ? 'win' : 'loss'}">${money(s.result, true)}</div></div>
+      <div><div class="label">Nights played</div><div class="v">${s.nights}</div></div>
+      <div><div class="label">Best night</div><div class="v win">${money(s.best, true)}</div></div>
+      <div><div class="label">Worst night</div><div class="v loss">${money(s.worst, true)}</div></div>
+    </div>
+    ${s.owes || s.owed ? `<div class="small">${s.owes ? `<span class="owes-house">Unpaid to house ${money(s.owes)}</span> ` : ''}${s.owed ? `<span class="owes-player">House owes ${money(s.owed)}</span>` : ''}</div>` : ''}
+    <div class="tablewrap"><table><thead><tr><th>Night</th><th>Buy-in</th><th>Cash-out</th><th>Result</th><th>Unpaid</th></tr></thead><tbody>
+    ${s.rows.map(([n,l]) => `<tr data-open-night="${n.id}" style="cursor:pointer"><td>${esc(shortDate(n.date))}</td><td>${money(l.buyin)}</td><td>${l.checkedOut ? money(l.cashout) : '—'}</td><td class="${l.result >= 0 ? 'win' : 'loss'}">${l.checkedOut ? money(l.result, true) : '—'}</td><td>${l.owesHouse > 0 ? `<span class="owes-house">owes ${money(l.owesHouse)}</span>` : l.houseOwes > 0 ? `<span class="owes-player">owed ${money(l.houseOwes)}</span>` : '—'}</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+function viewSettings(){
+  const head = `<div class="grow"><h1>Settings</h1><div class="sub">Passcode and backups</div></div>`;
+  const last = D.lastBackup ? new Date(D.lastBackup).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'never';
+  return [head, `
+  <div class="card stack"><h2>Access</h2>
+    <div class="small muted">The app locks every time it opens and after 5 minutes in the background. Data is stored only in this browser on this phone.</div>
+    <div class="row"><button class="btn sm" data-act="lockNow">Lock now</button><button class="btn sm ghost" data-act="changePass">Change passcode</button></div>
+  </div>
+  <div class="card stack"><h2>Backup &amp; copy to partner's phone</h2>
+    <div class="small muted">Last backup: <b>${esc(last)}</b>. Copy the backup and save it in Notes, or send it to your partner. On the other phone, open Restore and paste it.</div>
+    <div class="row"><button class="btn sm" data-act="exportData">Copy backup</button><button class="btn sm ghost" data-act="importData">Restore from backup</button></div>
+  </div>
+  <div class="card stack"><h2>Erase everything</h2><div class="small muted">Deletes all nights, players, expenses and the passcode on this phone.</div><button class="btn sm danger" data-act="resetAll">Erase all data</button></div>`];
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html, onSubmit){
+  closeSheet();
+  sheetEl = document.createElement('div'); sheetEl.className = 'scrim';
+  sheetEl.innerHTML = `<form class="sheet" role="dialog" aria-modal="true" novalidate><div class="handle"></div>${html}<div class="err" id="sheetErr" aria-live="polite"></div></form>`;
+  document.body.appendChild(sheetEl);
+  sheetEl.addEventListener('click', e => {
+    if (e.target === sheetEl || e.target.closest('[data-cancel]')) return closeSheet();
+    const chip = e.target.closest('.chips[data-pick] .chip');
+    if (chip){
+      e.preventDefault(); if (chip.disabled) return;
+      const g = chip.parentElement;
+      g.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c === chip));
+      const hidden = document.getElementById(g.dataset.pick); hidden.value = chip.dataset.val; hidden.dispatchEvent(new Event('change', { bubbles:true }));
+    }
+    if (e.target.closest('[data-addline]')){ e.preventDefault(); const box = e.target.closest('[data-paylines]'); box.querySelector('.lines').insertAdjacentHTML('beforeend', payLine(box.dataset.settle === '1', '', 'Cash')); }
+    const x = e.target.closest('.payline .x'); if (x){ e.preventDefault(); x.closest('.payline').remove(); sheetEl.querySelector('form').dispatchEvent(new Event('input')); }
+  });
+  sheetEl.querySelector('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const err = await onSubmit(sheetEl.querySelector('form'));
+    if (err) document.getElementById('sheetErr').textContent = err; else { closeSheet(); save(); render(); }
+  });
+  const first = sheetEl.querySelector('input:not([type=hidden]):not([readonly]),select,textarea'); if (first && !first.dataset.nofocus && first.tagName !== 'SELECT') setTimeout(() => first.focus(), 60);
+}
+function closeSheet(){ if (sheetEl){ sheetEl.remove(); sheetEl = null; } }
+const actions = (label, danger) => `<div class="grid2"><button class="btn ghost" type="button" data-cancel>Cancel</button><button class="btn ${danger ? 'danger' : ''}" type="submit">${label}</button></div>`;
+const methodPicker = (id, v) => `<div class="field"><label>Payment method</label><input type="hidden" id="${id}" value="${esc(v || 'Cash')}"><div class="chips" data-pick="${id}">${METHODS.map(m => `<button type="button" class="chip" data-val="${m}" aria-pressed="${m === (v || 'Cash')}">${m}</button>`).join('')}</div></div>`;
+const val = id => document.getElementById(id)?.value.trim() ?? '';
+
+// Payment lines: one or more amount + method rows. A blank amount on a lone row means "the full amount".
+const payLine = (settle, amt, method) => `<div class="payline"><input class="pl-amt" inputmode="decimal" placeholder="Full amount" value="${amt}" aria-label="Amount"><select class="pl-method" aria-label="Payment method">${[...METHODS, ...(settle ? [SETTLE] : [])].map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}</select><button type="button" class="x" aria-label="Remove line">✕</button></div>`;
+const payLines = (label, settle, method) => `<div class="field" data-paylines data-settle="${settle ? 1 : 0}"><label>${label}</label><div class="lines stack">${payLine(settle, '', method || 'Cash')}</div>
+  <button type="button" class="btn sm ghost" data-addline style="justify-self:start">+ Split between methods</button></div>`;
+function readLines(total){
+  const rows = [...sheetEl.querySelectorAll('.payline')].map(r => ({ raw: r.querySelector('.pl-amt').value.trim(), method: r.querySelector('.pl-method').value }));
+  if (rows.length === 1 && rows[0].raw === '') rows[0].raw = String(total / 100);
+  const lines = rows.filter(r => r.raw !== '').map(r => ({ amount: toCents(r.raw), method: r.method }));
+  if (lines.some(l => !(l.amount >= 0))) return { err: 'Each payment amount must be a number.' };
+  const paid = sum(lines.filter(l => l.method !== SETTLE), l => l.amount);
+  return { lines: lines.filter(l => l.amount > 0 && l.method !== SETTLE), paid };
+}
+
+function confirmSheet(title, text, label, fn){
+  openSheet(`<h2>${title}</h2><div class="small">${text}</div>${actions(label, true)}`, () => { fn(); });
+}
+
+function seatChips(n, pid, chosen){
+  const taken = takenSeats(n, pid);
+  return Array.from({ length: n.seats }, (_, i) => i + 1).map(s => `<button type="button" class="chip" data-val="${s}" aria-pressed="${s === chosen}" ${taken.includes(s) ? 'disabled' : ''}>${s}</button>`).join('')
+    + `<button type="button" class="chip" data-val="0" aria-pressed="${!chosen}">Waitlist</button>`;
+}
+function defaultSeat(n, pid, preset){
+  const taken = takenSeats(n, pid);
+  const p = player(pid);
+  if (preset && !taken.includes(preset)) return preset;
+  if (p?.prefSeat && p.prefSeat <= n.seats && !taken.includes(p.prefSeat)) return p.prefSeat;
+  for (let s = 1; s <= n.seats; s++) if (!taken.includes(s)) return s;
+  return 0;
+}
+
+function checkinSheet(n, presetSeat, waitOnly){
+  const inIds = nightPlayers(n);
+  const avail = D.players.filter(p => !inIds.includes(p.id)).sort((a,b) => (b.regular - a.regular) || a.name.localeCompare(b.name));
+  const firstPid = avail[0]?.id || '__new';
+  const seat0 = waitOnly ? 0 : defaultSeat(n, firstPid === '__new' ? null : firstPid, presetSeat);
+  openSheet(`<h2>Check in player</h2>
+    <div class="field"><label for="ciPlayer">Player</label><select id="ciPlayer">${avail.map(p => `<option value="${p.id}">${p.regular ? '★ ' : ''}${esc(p.name)}${p.prefSeat ? ' · seat ' + p.prefSeat : ''}</option>`).join('')}<option value="__new" ${firstPid === '__new' ? 'selected' : ''}>+ Create new player profile…</option></select></div>
+    <div class="stack" id="ciNew" ${firstPid === '__new' ? '' : 'hidden'}>
+      <div class="field"><label for="ciName">Name</label><input id="ciName" autocomplete="off"></div>
+      <div class="grid2"><div class="field"><label for="ciPhone">Phone (optional)</label><input id="ciPhone" type="tel"></div>
+      <label class="row" style="cursor:pointer;align-self:end;min-height:44px"><input id="ciReg" type="checkbox" style="width:22px;min-height:22px"><span>Regular</span></label></div>
+    </div>
+    <div class="field"><label>Seat</label><input type="hidden" id="ciSeat" value="${seat0}"><div class="chips" data-pick="ciSeat" id="ciSeats">${seatChips(n, null, seat0)}</div></div>
+    <div class="field"><label for="mAmt">Buy-in amount</label><input id="mAmt" inputmode="decimal" placeholder="Leave empty to seat without a buy-in" data-nofocus="1"></div>
+    ${payLines('How they paid', true)}
+    ${actions('Check in')}`, () => {
+    let pid = val('ciPlayer');
+    if (pid === '__new'){
+      const name = val('ciName'); if (!name) return 'Enter the new player\'s name.';
+      if (D.players.length >= MAX_PLAYERS) return `Your roster is full (${MAX_PLAYERS}). Remove a player first.`;
+      if (D.players.some(x => x.name.toLowerCase() === name.toLowerCase())) return 'A player with that name is already on the roster.';
+      const p = { id: uid(), name, phone: val('ciPhone'), notes:'', regular: document.getElementById('ciReg').checked, prefSeat:0 }; D.players.push(p); pid = p.id;
+    }
+    const amtRaw = val('mAmt'); let amt = 0, lines = [];
+    if (amtRaw !== ''){
+      amt = toCents(amtRaw); if (!(amt > 0)) return 'Enter the buy-in amount, or leave it empty.';
+      const r = readLines(amt); if (r.err) return r.err; if (r.paid > amt) return `Payments add up to ${money(r.paid)}, more than the ${money(amt)} buy-in.`;
+      lines = r.lines;
+    }
+    const seat = parseInt(val('ciSeat')) || 0;
+    if (seat && takenSeats(n, pid).includes(seat)) return `Seat ${seat} is taken.`;
+    n.rsvps.push({ pid, t: Date.now(), seat: seat || null, notes:'' });
+    if (amt) recordBuyin(n, pid, amt, lines);
+    toast(seat ? `${pname(pid)} in seat ${seat}` : `${pname(pid)} added to waitlist`);
+  });
+  document.getElementById('ciPlayer').addEventListener('change', e => {
+    const v = e.target.value; document.getElementById('ciNew').hidden = v !== '__new';
+    const s = waitOnly ? 0 : defaultSeat(n, v === '__new' ? null : v, presetSeat);
+    document.getElementById('ciSeat').value = s; document.getElementById('ciSeats').innerHTML = seatChips(n, null, s);
+  });
+}
+function recordBuyin(n, pid, amt, lines){
+  const t = Date.now();
+  n.entries.push({ id: uid(), pid, kind:'buyin', amount: amt, t });
+  lines.forEach((l, i) => n.entries.push({ id: uid(), pid, kind:'bpay', amount: l.amount, method: l.method, t: t + 1 + i }));
+}
+
+function rebuySheet(n, pid){
+  const l = playerLedger(n, pid);
+  openSheet(`<div class="label">${l.buyin ? 'Rebuy' : 'Buy-in'}</div><h2>${esc(pname(pid))}</h2>
+    ${l.buyin ? `<div class="small muted num">In for ${money(l.buyin)} so far${l.owesHouse > 0 ? ` · settle at end ${money(l.owesHouse)}` : ''}</div>` : ''}
+    <div class="field"><label for="mAmt">Amount</label><input id="mAmt" inputmode="decimal" placeholder="500" required></div>
+    ${payLines('How they paid', true)}
+    ${actions(l.buyin ? 'Record rebuy' : 'Record buy-in')}`, () => {
+    const amt = toCents(val('mAmt')); if (!(amt > 0)) return 'Enter the amount.';
+    const r = readLines(amt); if (r.err) return r.err; if (r.paid > amt) return `Payments add up to ${money(r.paid)}, more than ${money(amt)}.`;
+    recordBuyin(n, pid, amt, r.lines);
+    toast(r.paid < amt ? `${pname(pid)}: ${money(amt - r.paid)} to settle at end` : 'Recorded');
+  });
+}
+
+function cashoutSheet(n, pid){
+  const l = playerLedger(n, pid);
+  const owed = Math.max(0, l.owesHouse);
+  openSheet(`<div class="label">Cash Out</div><h2>${esc(pname(pid))}</h2>
+    <div class="small muted num">Bought in ${money(l.buyin)} · paid ${money(l.bpaid)}${owed ? ` · <span class="owes-house">settle at end ${money(owed)}</span>` : ''}</div>
+    <div class="field"><label for="mAmt">Chips cashed out</label><input id="mAmt" inputmode="decimal" placeholder="0 if they busted" required></div>
+    <div class="preview num" id="coPrev"><span class="muted">Enter the chip count to see who pays whom.</span></div>
+    <div id="coLines">${payLines('Paid how', true)}</div>
+    ${actions('Cash out')}`, () => {
+    const raw = val('mAmt'); const chips = toCents(raw); if (raw === '' || !(chips >= 0)) return 'Enter the chips cashed out (0 if they busted).';
+    const net = chips - owed;
+    const r = readLines(Math.abs(net)); if (r.err) return r.err;
+    if (r.paid > Math.abs(net)) return `Payments add up to ${money(r.paid)}, more than the ${money(Math.abs(net))} due.`;
+    if (net < 0 && r.paid < -net) return `${pname(pid)} still owes ${money(-net - r.paid)}. Their account has to be zero before they cash out.`;
+    const t = Date.now(), offset = Math.min(owed, chips);
+    n.entries.push({ id: uid(), pid, kind:'cashout', amount: chips, t });
+    if (offset > 0){
+      n.entries.push({ id: uid(), pid, kind:'bpay', amount: offset, method: NETTED, t: t+1 });
+      n.entries.push({ id: uid(), pid, kind:'cpay', amount: offset, method: NETTED, t: t+2 });
+    }
+    r.lines.forEach((x, i) => n.entries.push({ id: uid(), pid, kind: net >= 0 ? 'cpay' : 'bpay', amount: x.amount, method: x.method, t: t + 3 + i }));
+    toast(net > 0 && r.paid < net ? `House owes ${pname(pid)} ${money(net - r.paid)}` : `${pname(pid)} cashed out`);
+  });
+  const amt = document.getElementById('mAmt');
+  const update = () => {
+    const chips = toCents(amt.value), box = document.getElementById('coPrev');
+    if (!(chips >= 0) || amt.value.trim() === ''){ box.innerHTML = '<span class="muted">Enter the chip count to see who pays whom.</span>'; return; }
+    const net = chips - owed, res = chips - l.buyin;
+    const lbl = sheetEl.querySelector('[data-paylines] > label');
+    box.innerHTML = `<div class="split"><span>Chips</span><b>${money(chips)}</b></div>
+      ${owed ? `<div class="split"><span>Settle-at-end balance</span><b class="owes-house">−${money(owed)}</b></div>` : ''}
+      <div class="split"><span>${net > 0 ? 'House pays player' : net < 0 ? 'Player pays house' : 'Nothing changes hands'}</span><b class="${net > 0 ? 'owes-player' : net < 0 ? 'owes-house' : 'win'}">${money(Math.abs(net))}</b></div>
+      <div class="split small muted"><span>Night result</span><span class="${res >= 0 ? 'win' : 'loss'}">${money(res, true)}</span></div>`;
+    lbl.textContent = net > 0 ? 'How the house is paying' : net < 0 ? 'How the player is paying the balance' : 'Paid how';
+    document.getElementById('coLines').hidden = net === 0;
+  };
+  amt.addEventListener('input', update);
+}
+
+function balanceSheet(n, pid, kind){
+  const l = playerLedger(n, pid);
+  const due = kind === 'cpay' ? l.houseOwes : l.owesHouse;
+  openSheet(`<div class="label">${kind === 'cpay' ? 'Pay balance to player' : 'Collect balance from player'}</div><h2>${esc(pname(pid))}</h2>
+    <div class="small num">${kind === 'cpay' ? `House owes <b class="owes-player">${money(due)}</b>` : `Player owes <b class="owes-house">${money(due)}</b>`}</div>
+    ${payLines('Paid how', false)}${actions('Record payment')}`, () => {
+    const r = readLines(due); if (r.err) return r.err; if (!r.paid) return 'Enter an amount.';
+    if (r.paid > due) return `That is more than the ${money(due)} balance.`;
+    r.lines.forEach((x, i) => n.entries.push({ id: uid(), pid, kind, amount: x.amount, method: x.method, t: Date.now() + i }));
+    toast('Payment recorded');
+  });
+}
+
+function notesSheet(n, pid){
+  let r = rsvp(n, pid);
+  openSheet(`<div class="label">Notes for tonight</div><h2>${esc(pname(pid))}</h2>
+    <div class="field"><label for="nNotes">Notes</label><textarea id="nNotes" placeholder="Left early, will pay balance Friday">${esc(r?.notes)}</textarea></div>${actions('Save notes')}`, () => {
+    if (!r){ r = { pid, t: Date.now(), seat: null, notes:'' }; n.rsvps.push(r); }
+    r.notes = val('nNotes'); toast('Notes saved');
+  });
+}
+
+function playerNightSheet(n, pid){
+  let r = rsvp(n, pid);
+  const p = player(pid);
+  const cur = r?.seat && r.seat <= n.seats ? r.seat : 0;
+  const hasMoney = n.entries.some(e => e.pid === pid);
+  openSheet(`<div class="label">Tonight</div><h2>${esc(pname(pid))}</h2>
+    <div class="field"><label>Seat</label><input type="hidden" id="pnSeat" value="${cur}"><div class="chips" data-pick="pnSeat">${seatChips(n, pid, cur)}</div></div>
+    ${actions('Save seat')}
+    <div class="row">${p ? '<button type="button" class="btn sm ghost" data-act="editProfile">Edit player profile</button>' : ''}
+    ${hasMoney ? '' : '<button type="button" class="btn sm danger" data-act="removeFromNight">Remove from tonight</button>'}</div>`, () => {
+    const s = parseInt(val('pnSeat')) || 0;
+    if (s && takenSeats(n, pid).includes(s)) return `Seat ${s} is taken.`;
+    if (!r){ r = { pid, t: Date.now(), seat: null, notes:'' }; n.rsvps.push(r); }
+    r.seat = s || null; toast(s ? `Seat ${s}` : 'Moved to waitlist');
+  });
+  sheetEl.querySelector('[data-act=editProfile]')?.addEventListener('click', () => playerSheet(p));
+  sheetEl.querySelector('[data-act=removeFromNight]')?.addEventListener('click', () => { n.rsvps = n.rsvps.filter(x => x.pid !== pid); closeSheet(); save(); render(); toast('Removed from tonight'); });
+}
+
+function playerSheet(p){
+  const editing = !!p; p = p || { name:'', phone:'', notes:'', regular:false, prefSeat:0 };
+  openSheet(`<h2>${editing ? 'Edit player' : 'New player'}</h2>
+    <div class="field"><label for="pName">Name</label><input id="pName" value="${esc(p.name)}" required autocomplete="off"></div>
+    <div class="grid2"><div class="field"><label for="pPhone">Phone (optional)</label><input id="pPhone" type="tel" value="${esc(p.phone)}"></div>
+    <div class="field"><label for="pSeat">Preferred seat</label><select id="pSeat"><option value="0">No preference</option>${[1,2,3,4,5,6,7,8,9].map(s => `<option value="${s}" ${s === p.prefSeat ? 'selected' : ''}>Seat ${s}</option>`).join('')}</select></div></div>
+    <div class="field"><label for="pNotes">Notes (optional)</label><input id="pNotes" value="${esc(p.notes)}" placeholder="Prefers Venmo"></div>
+    <label class="row" style="cursor:pointer"><input id="pReg" type="checkbox" style="width:22px;min-height:22px" ${p.regular ? 'checked' : ''}><span>Regular (top of the waitlist)</span></label>
+    ${actions(editing ? 'Save' : 'Add player')}
+    ${editing ? '<button type="button" class="btn danger sm" id="pDel">Remove from roster</button>' : ''}`, () => {
+    const name = val('pName'); if (!name) return 'Enter a name.';
+    if (D.players.some(x => x.name.toLowerCase() === name.toLowerCase() && x.id !== p.id)) return 'A player with that name is already on the roster.';
+    if (!editing && D.players.length >= MAX_PLAYERS) return `Your roster is full (${MAX_PLAYERS} players).`;
+    const data = { name, phone: val('pPhone'), notes: val('pNotes'), regular: document.getElementById('pReg').checked, prefSeat: parseInt(val('pSeat')) || 0 };
+    if (editing) Object.assign(p, data); else D.players.push({ id: uid(), ...data });
+    toast(editing ? 'Saved' : 'Player added');
+  });
+  document.getElementById('pDel')?.addEventListener('click', () => {
+    if (D.nights.some(n => n.entries.some(e => e.pid === p.id))) { document.getElementById('sheetErr').textContent = 'This player has money recorded on past nights, so they stay on the roster to keep reports correct.'; return; }
+    confirmSheet('Remove player?', `${esc(p.name)} will be removed from the roster and from any seat lists.`, 'Remove', () => {
+      D.players = D.players.filter(x => x.id !== p.id); D.nights.forEach(n => n.rsvps = n.rsvps.filter(r => r.pid !== p.id));
+    });
+  });
+}
+
+function expenseSheet(x){
+  const editing = !!x; x = x || { date: todayISO(), category: CATEGORIES[0], desc:'', amount:0, method:'Cash' };
+  openSheet(`<h2>${editing ? 'Edit expense' : 'Monthly expense'}</h2>
+    <div class="grid2"><div class="field"><label for="xDate">Date</label><input id="xDate" type="date" value="${esc(x.date)}" required data-nofocus="1"></div>
+    <div class="field"><label for="xAmt">Amount</label><input id="xAmt" inputmode="decimal" value="${x.amount ? x.amount/100 : ''}" required></div></div>
+    <div class="field"><label for="xCat">Category</label><select id="xCat">${CATEGORIES.map(c => `<option ${c === x.category ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+    <div class="field"><label for="xDesc">Description</label><input id="xDesc" value="${esc(x.desc)}" placeholder="New deck of cards"></div>
+    ${methodPicker('xMethod', x.method)}${actions(editing ? 'Save' : 'Add expense')}
+    ${editing ? '<button type="button" class="btn danger sm" id="xDel">Delete expense</button>' : ''}`, () => {
+    const amount = toCents(val('xAmt')); if (!(amount > 0)) return 'Enter the amount.';
+    const data = { date: val('xDate') || todayISO(), category: val('xCat'), desc: val('xDesc'), amount, method: val('xMethod') };
+    if (editing) Object.assign(x, data); else D.expenses.push({ id: uid(), ...data });
+    toast(editing ? 'Saved' : 'Expense added');
+  });
+  document.getElementById('xDel')?.addEventListener('click', () => confirmSheet('Delete expense?', `${esc(x.desc || x.category)}, ${money(x.amount)}`, 'Delete', () => { D.expenses = D.expenses.filter(e => e.id !== x.id); }));
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('button,[data-open-night],[data-report-player]'); if (!t) return;
+  if (t.closest('.scrim')) return; // sheets handle their own clicks
+  const d = t.dataset;
+  if (d.key) return keyPress(d.key);
+  if (d.tab){ UI.tab = d.tab; if (d.tab === 'nights') UI.nightId = null; render(); scrollTo(0,0); return; }
+  if (d.openNight){ UI.tab = 'nights'; UI.nightId = d.openNight; UI.nightTab = night(d.openNight)?.status === 'closed' ? 'close' : 'money'; render(); scrollTo(0,0); return; }
+  if (d.nightTab){ UI.nightTab = d.nightTab; render(); return; }
+  if (d.report){ UI.report = d.report; render(); return; }
+  if (d.reportPlayer){ UI.reportPlayer = d.reportPlayer; render(); return; }
+  if (d.editPlayer) return playerSheet(player(d.editPlayer));
+  if (d.editExpense) return expenseSheet(D.expenses.find(x => x.id === d.editExpense));
+  if (d.hp){ document.getElementById('hpSign').value = d.hp; t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === t)); return; }
+  const n = night(UI.nightId);
+  if (d.playerNight) return playerNightSheet(n, d.playerNight);
+  if (d.delEntry){ const x = n.entries.find(y => y.id === d.delEntry); return confirmSheet('Delete this line?', `${esc(pname(x.pid))}: ${money(x.amount)}${x.method ? ' · ' + esc(x.method) : ''}`, 'Delete', () => { n.entries = n.entries.filter(y => y.id !== x.id); }); }
+  switch (d.act){
+    case 'newNight':
+      return openSheet(`<h2>Set up a game night</h2>${nightFields()}${actions('Create night')}`, () => {
+        const nn = { id: uid(), ...readNightFields(), status:'open', rsvps:[], entries:[], rake:0, tips:0, expense:0, expenseNote:'', housePlay:0 };
+        D.nights.push(nn); UI.nightId = nn.id; UI.nightTab = 'money'; toast('Night created');
+      });
+    case 'backNights': UI.nightId = null; render(); return;
+    case 'checkin': return checkinSheet(n, parseInt(d.seat) || 0, !!d.wait);
+    case 'rebuy': return rebuySheet(n, d.pid);
+    case 'cashout': return cashoutSheet(n, d.pid);
+    case 'paybalance': return balanceSheet(n, d.pid, 'cpay');
+    case 'collect': return balanceSheet(n, d.pid, 'bpay');
+    case 'notes': return notesSheet(n, d.pid);
+    case 'seatCount':
+      return openSheet(`<h2>Seats at the table</h2><input type="hidden" id="scVal" value="${n.seats}"><div class="chips" data-pick="scVal">${[2,3,4,5,6,7,8,9,10].map(s => `<button type="button" class="chip" data-val="${s}" aria-pressed="${s === n.seats}">${s}</button>`).join('')}</div>
+        <div class="small muted">Players in seats above the new count move to the waitlist.</div>${actions('Save')}`, () => { n.seats = parseInt(val('scVal')) || 9; });
+    case 'newPlayer': return playerSheet();
+    case 'newExpense': return expenseSheet();
+    case 'closeNight': {
+      const playing = nightPlayers(n).filter(pid => { const l = playerLedger(n, pid); return l.buyin && !l.checkedOut; }).map(pname);
+      return confirmSheet('Close the night?', `${playing.length ? `<b class="owes-house">Not cashed out yet: ${esc(playing.join(', '))}.</b><br>` : ''}Totals go into reports. Unpaid amounts stay on this night. You can reopen it later to fix mistakes.`, 'Close night', () => { readCloseForm(n); n.status = 'closed'; toast('Night closed'); });
+    }
+    case 'reopenNight': n.status = 'open'; save(); render(); toast('Night reopened'); return;
+    case 'deleteNight': return confirmSheet('Delete this night?', 'All buy-ins, cash-outs, payments and expenses for this night will be deleted.', 'Delete night', () => { D.nights = D.nights.filter(x => x.id !== n.id); UI.nightId = null; });
+    case 'lockNow': UI.locked = true; UI.entry = ''; render(); return;
+    case 'forgot': return openSheet(`<h2>Forgot passcode</h2><div class="small">Without the passcode, the only way in is to erase this phone's data. If your partner has a copy, restore it from their backup afterwards.</div><div class="field"><label for="wipe">Type ERASE to confirm</label><input id="wipe" autocomplete="off"></div>${actions('Erase and start over', true)}`, () => { if (val('wipe') !== 'ERASE') return 'Type ERASE in capitals to confirm.'; D = blank(); setupFirst = null; });
+    case 'changePass': return openSheet(`<h2>Change passcode</h2><div class="field"><label for="op">Current passcode</label><input id="op" type="password" inputmode="numeric" maxlength="6"></div><div class="field"><label for="np">New 6-digit passcode</label><input id="np" type="password" inputmode="numeric" maxlength="6"></div>${actions('Change passcode')}`, async () => {
+        if (await hash(val('op')) !== D.passHash) return 'Current passcode is wrong.';
+        if (!/^\d{6}$/.test(val('np'))) return 'New passcode must be 6 digits.';
+        D.passHash = await hash(val('np')); toast('Passcode changed');
+      });
+    case 'exportData': {
+      const json = JSON.stringify({ app:'home-game-ledger', exported: new Date().toISOString(), data: { ...D, passHash: undefined } });
+      return openSheet(`<h2>Backup</h2><div class="small muted">Copy this text and keep it in Notes or send it to your partner. It holds all your money records, so keep it private.</div><textarea id="bk" readonly style="min-height:140px;font-size:12px" data-nofocus="1">${esc(json)}</textarea><div class="grid2"><button class="btn ghost" type="button" data-cancel>Done</button><button class="btn" type="submit">Copy</button></div>`, async () => {
+        const ta = document.getElementById('bk');
+        try { await navigator.clipboard.writeText(ta.value); } catch(err){ ta.focus(); ta.select(); return 'Copy was blocked. The text is selected: tap and hold, then Copy.'; }
+        D.lastBackup = Date.now(); toast('Backup copied');
+      });
+    }
+    case 'importData':
+      return openSheet(`<h2>Restore from backup</h2><div class="small">This replaces everything on this phone with the backup. Your passcode stays the same.</div>
+        <div class="field"><label for="imp">Paste backup text</label><textarea id="imp" placeholder='{"app":"home-game-ledger", …}'></textarea></div>
+        <div class="field"><label for="impFile">Or choose a backup file</label><input id="impFile" type="file" accept=".json,.txt,application/json,text/plain"></div>${actions('Replace data', true)}`, async () => {
+        let txt = val('imp'); const f = document.getElementById('impFile').files[0];
+        if (!txt && f) txt = await f.text();
+        try { const o = JSON.parse(txt); if (o.app !== 'home-game-ledger' || !o.data) throw 0; D = Object.assign(blank(), o.data, { passHash: D.passHash }); migrate(); toast('Backup restored'); }
+        catch(err){ return 'That is not a Home Game Ledger backup. Copy the whole text and try again.'; }
+      });
+    case 'resetAll': return openSheet(`<h2>Erase all data?</h2><div class="small">This cannot be undone. Copy a backup first if you might need it.</div><div class="field"><label for="wipe">Type ERASE to confirm</label><input id="wipe" autocomplete="off"></div>${actions('Erase everything', true)}`, () => { if (val('wipe') !== 'ERASE') return 'Type ERASE in capitals to confirm.'; D = blank(); UI.locked = true; UI.tab = 'nights'; UI.nightId = null; });
+  }
+});
+function readCloseForm(n){
+  const g = id => { const el = document.getElementById(id); if (!el) return null; const v = el.value.trim(); return v === '' ? 0 : toCents(v); };
+  const rake = g('rake'), tips = g('tips'), exp = g('nexp'), hp = g('hp');
+  if (rake === null) return null; // close form not on screen
+  if (![rake, tips, exp, hp].every(v => v >= 0)) return 'Rake, tips, expenses and house play must be numbers.';
+  n.rake = rake; n.tips = tips; n.expense = exp; n.expenseNote = val('nexpNote');
+  n.housePlay = val('hpSign') === '-' ? -hp : hp;
+  n.tipsMethod = val('tipsM') || 'Cash'; n.expenseMethod = val('nexpM') || 'Cash';
+  const cc = val('cashCount'); n.cashCounted = cc === '' ? null : (toCents(cc) >= 0 ? toCents(cc) : n.cashCounted);
+  return null;
+}
+document.addEventListener('submit', e => {
+  const f = e.target; if (f.closest('.scrim')) return; e.preventDefault();
+  const n = night(UI.nightId);
+  if (f.id === 'closeForm'){ const err = readCloseForm(n); if (err) return toast(err); save(); render(); toast('Saved'); }
+  else if (f.id === 'nightForm'){ Object.assign(n, readNightFields()); save(); render(); toast('Details saved'); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'monthSel'){ UI.month = e.target.value; render(); }
+  if (e.target.id === 'cashCount'){ const n = night(UI.nightId); const v = e.target.value.trim(); const c = toCents(v); n.cashCounted = v === '' ? null : (c >= 0 ? c : n.cashCounted); save(); render(); }
+});
+document.addEventListener('keydown', e => {
+  if (UI.locked && /^[0-9]$/.test(e.key)) keyPress(e.key);
+  else if (UI.locked && e.key === 'Backspace') keyPress('del');
+  else if (e.key === 'Escape') closeSheet();
+});
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (D.passHash && !UI.locked && Date.now() - hiddenAt > 5*60*1000){ closeSheet(); UI.locked = true; UI.entry = ''; render(); }
+});
+
+load();
+try { navigator.storage?.persist?.(); } catch(e){}
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+render();
+})();
+</script>
+
+</body>
+</html>
