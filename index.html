@@ -186,6 +186,11 @@ tr.tot td{border-bottom:0;font-weight:800}
 .closegrid .segs button{padding:6px 2px;font-size:.85rem}
 @media (max-width:360px){.closegrid,.flow{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .2s cubic-bezier(.2,.8,.2,1)}@keyframes up{from{transform:translateY(40px);opacity:.5}}}
+.session summary{list-style:none;cursor:pointer;display:grid;gap:2px}
+.session summary::-webkit-details-marker{display:none}
+.session[open] summary{padding-bottom:10px;border-bottom:1px solid var(--line)}
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;display:block;text-align:left}
+.grid2 input,.grid2 select{min-width:0;max-width:100%}
 </style>
 
 </head>
@@ -196,7 +201,7 @@ tr.tot td{border-bottom:0;font-weight:800}
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '5 · Contacts';
+const APP_VERSION = '6 · Sessions';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -359,6 +364,7 @@ const ICON = {
   expenses:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
   reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   back:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg>',
 };
 
@@ -388,7 +394,7 @@ function viewNights(){
       <div class="split"><h3>${esc(fmtDate(n.date))}</h3><span class="pill ${n.status}">${n.status === 'open' ? 'Live' : 'Closed'}</span></div>
       <div class="small"><b style="color:var(--gold-hi)">${esc(n.gameType)}</b><span class="muted"> · ${esc([fmtTime(n.start), n.location, n.seats + ' seats'].filter(Boolean).join(' · '))}</span></div>
       <div class="row small num">
-        <span>${t.players} players</span><span class="muted">·</span><span>In ${money(t.buyin)}</span><span class="muted">·</span><span>Out ${money(t.cashout)}</span>
+        <span>${t.players} player${t.players === 1 ? '' : 's'}</span><span class="muted">·</span><span>In ${money(t.buyin)}</span><span class="muted">·</span><span>Out ${money(t.cashout)}</span>
       </div>
       ${(t.owesHouse || t.houseOwes) ? `<div class="row small num">${t.owesHouse ? `<span class="owes-house">Owed to house ${money(t.owesHouse)}</span>` : ''}${t.houseOwes ? `<span class="owes-player">House owes players ${money(t.houseOwes)}</span>` : ''}</div>` : ''}
       ${n.status === 'closed' ? `<div class="small num">House net <b class="${t.net >= 0 ? 'win' : 'loss'}">${money(t.net)}</b></div>` : ''}
@@ -400,12 +406,13 @@ function viewNights(){
 function viewNight(n){
   const head = `<button class="iconbtn" data-act="backNights" aria-label="All nights">${ICON.back}</button>
     <div class="grow"><h1>${esc(fmtDate(n.date))}</h1><div class="sub">${esc([n.gameType, fmtTime(n.start), n.location].filter(Boolean).join(' · '))}</div></div>
-    <span class="pill ${n.status}">${n.status === 'open' ? 'Live' : 'Closed'}</span>`;
+    <span class="pill ${n.status}">${n.status === 'open' ? 'Live' : 'Closed'}</span>
+    <button class="iconbtn" data-act="editNight" aria-label="Edit night details">${ICON.edit}</button>`;
   const seg = (k, l) => `<button data-night-tab="${k}" aria-pressed="${UI.nightTab === k}">${l}</button>`;
-  let body = `<div class="segs">${seg('money','Money')}${seg('seats','Seats')}${seg('close','Settle')}${seg('info','Details')}</div>`;
+  let body = `<div class="segs">${seg('money','Money')}${seg('seats','Seats')}${seg('close','Settle')}${seg('sessions','Sessions')}</div>`;
   if (UI.nightTab === 'seats') body += nightSeats(n);
   else if (UI.nightTab === 'close') body += nightClose(n);
-  else if (UI.nightTab === 'info') body += nightInfo(n);
+  else if (UI.nightTab === 'sessions') body += nightSessions(n);
   else body += nightMoney(n);
   return [head, body];
 }
@@ -609,9 +616,56 @@ function settlementCard(n){
     </div>
   </div>`;
 }
-function nightInfo(n){
-  return `<form class="card stack" id="nightForm">${nightFields(n)}<button class="btn" type="submit">Save details</button></form>
-    <button class="btn danger block" data-act="deleteNight">Delete this night</button>`;
+// Past hosted games, newest first; each expands to its players and money summary.
+function nightSessions(cur){
+  const list = [...D.nights].sort((a,b) => (b.date + b.start).localeCompare(a.date + a.start));
+  const all = list.map(n => [n, nightTotals(n)]);
+  const closed = all.filter(([n]) => n.status === 'closed');
+  const head = `<div class="card stack">
+    <div class="split"><h2>All sessions</h2><span class="small muted num">${list.length} hosted</span></div>
+    <div class="stat">
+      <div><div class="label">Total rake</div><div class="v">${money(sum(all, ([,t]) => t.rake))}</div></div>
+      <div><div class="label">House net</div><div class="v ${sum(all, ([,t]) => t.net) >= 0 ? 'win' : 'loss'}">${money(sum(all, ([,t]) => t.net))}</div></div>
+      <div><div class="label">Total buy-ins</div><div class="v">${money(sum(all, ([,t]) => t.buyin))}</div></div>
+      <div><div class="label">Avg players</div><div class="v">${list.length ? Math.round(sum(all, ([,t]) => t.players) / list.length * 10) / 10 : 0}</div></div>
+    </div>
+    ${closed.length < list.length ? `<div class="small muted">${list.length - closed.length} session${list.length - closed.length === 1 ? ' is' : 's are'} still live.</div>` : ''}
+  </div>`;
+  return head + all.map(([n,t]) => {
+    const rows = nightPlayers(n).map(pid => [pid, playerLedger(n, pid)]).filter(([,l]) => l.e.length);
+    const s = settlement(n);
+    const isCur = n.id === cur.id;
+    return `<details class="card session" ${isCur ? 'open' : ''}>
+      <summary>
+        <div class="split"><span><b>${esc(fmtDate(n.date))}</b>${isCur ? ' <span class="pill reg">Viewing</span>' : ''}</span><span class="pill ${n.status}">${n.status === 'open' ? 'Live' : 'Closed'}</span></div>
+        <div class="small muted">${esc([n.gameType, fmtTime(n.start), n.location].filter(Boolean).join(' · '))}</div>
+        <div class="row small num" style="margin-top:4px"><span>${t.players} player${t.players === 1 ? '' : 's'}</span><span class="muted">·</span><span>In ${money(t.buyin)}</span><span class="muted">·</span><span>Rake ${money(t.rake)}</span><span class="muted">·</span><span class="${t.net >= 0 ? 'win' : 'loss'}">Net ${money(t.net)}</span></div>
+      </summary>
+      <div class="stack" style="margin-top:12px">
+        ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Player</th><th>Buy-in</th><th>Cash-out</th><th>Result</th><th>Unpaid</th></tr></thead><tbody>
+          ${rows.map(([pid,l]) => `<tr><td>${esc(pname(pid))}</td><td>${money(l.buyin)}</td><td>${l.checkedOut ? money(l.cashout) : '—'}</td><td class="${l.result >= 0 ? 'win' : 'loss'}">${l.checkedOut ? money(l.result, true) : '—'}</td><td>${l.owesHouse > 0 ? `<span class="owes-house">owes ${money(l.owesHouse)}</span>` : l.houseOwes > 0 ? `<span class="owes-player">owed ${money(l.houseOwes)}</span>` : '—'}</td></tr>`).join('')}
+        </tbody></table></div>` : '<div class="small muted">No money recorded.</div>'}
+        <div class="kv num small">
+          <span>Buy-ins / cash-outs</span><span class="v">${money(t.buyin)} / ${money(t.cashout)}</span>
+          <span>Rake</span><span class="v">${money(t.rake)}</span>
+          <span>Dealer tips</span><span class="v">−${money(t.tips)}</span>
+          <span>Expenses${n.expenseNote ? ' (' + esc(n.expenseNote) + ')' : ''}</span><span class="v">−${money(t.nightExp)}</span>
+          <span>House play</span><span class="v ${t.housePlay >= 0 ? 'win' : 'loss'}">${money(t.housePlay, true)}</span>
+          <span class="total"><b>House net</b></span><span class="v total ${t.net >= 0 ? 'win' : 'loss'}">${money(t.net)}</span>
+          <span>Cash in hand</span><span class="v">${money(s.cashHave)}</span>
+          <span class="owes-house">Owed to house</span><span class="v owes-house">${money(t.owesHouse)}</span>
+          <span class="owes-player">House owes</span><span class="v owes-player">${money(t.houseOwes)}</span>
+        </div>
+        ${n.rules ? `<div class="small muted">House rules: ${esc(n.rules)}</div>` : ''}
+        ${isCur ? '' : `<button class="btn ghost block" data-open-night="${n.id}">Open this session</button>`}
+      </div>
+    </details>`;
+  }).join('');
+}
+function editNightSheet(n){
+  openSheet(`<h2>Night details</h2>${nightFields(n)}${actions('Save details')}
+    <button type="button" class="btn danger sm" id="nDel">Delete this night</button>`, () => { Object.assign(n, readNightFields()); toast('Details saved'); });
+  document.getElementById('nDel').addEventListener('click', () => confirmSheet('Delete this night?', 'All buy-ins, cash-outs, payments and expenses for this night will be deleted.', 'Delete night', () => { D.nights = D.nights.filter(x => x.id !== n.id); UI.nightId = null; }));
 }
 function nightFields(n){
   n = n || { date: todayISO(), start:'19:00', location:'', gameType: GAME_TYPES[0], rules:'', seats:9 };
@@ -1121,6 +1175,7 @@ document.addEventListener('click', e => {
       return confirmSheet('Close the night?', `${playing.length ? `<b class="owes-house">Not cashed out yet: ${esc(playing.join(', '))}.</b><br>` : ''}Totals go into reports. Unpaid amounts stay on this night. You can reopen it later to fix mistakes.`, 'Close night', () => { readCloseForm(n); n.status = 'closed'; toast('Night closed'); });
     }
     case 'reopenNight': n.status = 'open'; save(); render(); toast('Night reopened'); return;
+    case 'editNight': return editNightSheet(n);
     case 'deleteNight': return confirmSheet('Delete this night?', 'All buy-ins, cash-outs, payments and expenses for this night will be deleted.', 'Delete night', () => { D.nights = D.nights.filter(x => x.id !== n.id); UI.nightId = null; });
     case 'lockNow': UI.locked = true; UI.entry = ''; render(); return;
     case 'forgot': return openSheet(`<h2>Forgot passcode</h2><div class="small">Without the passcode, the only way in is to erase this phone's data. If your partner has a copy, restore it from their backup afterwards.</div><div class="field"><label for="wipe">Type ERASE to confirm</label><input id="wipe" autocomplete="off"></div>${actions('Erase and start over', true)}`, () => { if (val('wipe') !== 'ERASE') return 'Type ERASE in capitals to confirm.'; D = blank(); setupFirst = null; });
