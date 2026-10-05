@@ -633,8 +633,8 @@ function readNightFields(){
 function viewPlayers(){
   const ps = [...D.players].sort((a,b) => (b.regular - a.regular) || a.name.localeCompare(b.name));
   const head = `<div class="grow"><h1>Roster</h1><div class="sub num">${ps.length} of ${MAX_PLAYERS} players · ${ps.filter(p => p.regular).length} regulars</div></div>
-    <button class="btn sm" data-act="newPlayer" ${ps.length >= MAX_PLAYERS ? 'disabled' : ''}>+ Player</button>`;
-  if (!ps.length) return [head, `<div class="card empty"><div class="suits">♠♥♦♣</div><div><h2>Build your roster</h2><p class="small">Create a profile for each player, up to 40. Mark regulars so they move up the waitlist, and set a preferred seat.</p></div><button class="btn" data-act="newPlayer">Add a player</button></div>`];
+    <button class="btn sm ghost" data-act="importContacts" ${ps.length >= MAX_PLAYERS ? 'disabled' : ''}>Contacts</button><button class="btn sm" data-act="newPlayer" ${ps.length >= MAX_PLAYERS ? 'disabled' : ''}>+ Player</button>`;
+  if (!ps.length) return [head, `<div class="card empty"><div class="suits">♠♥♦♣</div><div><h2>Build your roster</h2><p class="small">Create a profile for each player, up to 40. Mark regulars so they move up the waitlist, and set a preferred seat.</p></div><div class="row" style="justify-content:center"><button class="btn" data-act="importContacts">Add from Contacts</button><button class="btn ghost" data-act="newPlayer">Type a player</button></div></div>`];
   return [head, ps.map(p => {
     const nights = D.nights.filter(n => n.entries.some(e => e.pid === p.id));
     return `<button class="card tap" data-edit-player="${p.id}"><div class="row"><span class="grow"><b>${esc(p.name)}</b> ${p.regular ? '<span class="pill reg">Regular</span>' : ''}<div class="small muted">${esc([p.prefSeat ? 'Prefers seat ' + p.prefSeat : '', p.phone, p.notes].filter(Boolean).join(' · ') || ' ')}</div></span>
@@ -759,6 +759,56 @@ function viewSettings(){
   <div class="card stack"><h2>Erase everything</h2><div class="small muted">Deletes all nights, players, expenses and the passcode on this phone.</div><button class="btn sm danger" data-act="resetAll">Erase all data</button></div>`];
 }
 
+/* ---------- contacts ---------- */
+// iPhone Safari offers the Contacts picker when "Contact Picker API" is on; otherwise a shared contact card (.vcf) works.
+const canPickContacts = () => !!(navigator.contacts && navigator.contacts.select);
+const cleanPhone = t => String(t || '').trim();
+async function pickContacts(multiple){
+  const res = await navigator.contacts.select(['name','tel'], { multiple });
+  return res.map(c => ({ name: (c.name && c.name[0] || '').trim(), phone: cleanPhone(c.tel && c.tel[0]) })).filter(c => c.name);
+}
+function parseVCF(text){
+  const unfolded = text.replace(/\r\n/g,'\n').replace(/\n[ \t]/g,'');
+  return unfolded.split(/BEGIN:VCARD/i).slice(1).map(card => {
+    const line = re => (card.match(re) || [])[1] || '';
+    let name = line(/^FN[^:\n]*:(.*)$/im).trim();
+    if (!name){ const n = line(/^N[^:\n]*:(.*)$/im).split(';'); name = [n[1], n[0]].filter(Boolean).join(' ').trim(); }
+    const phone = cleanPhone(line(/^(?:item\d+\.)?TEL[^:\n]*:(.*)$/im));
+    return { name: name.replace(/\\,/g, ',').replace(/\;/g, ';'), phone };
+  }).filter(c => c.name);
+}
+// Gets contacts from the picker, or from a chosen .vcf file when the picker isn't available
+async function getContacts(multiple, fileInput){
+  if (canPickContacts()){ try { return await pickContacts(multiple); } catch(e){ return []; } }
+  return new Promise(resolve => {
+    fileInput.onchange = async () => {
+      const out = [];
+      for (const f of fileInput.files) out.push(...parseVCF(await f.text()));
+      fileInput.value = ''; resolve(multiple ? out : out.slice(0,1));
+    };
+    fileInput.click();
+  });
+}
+const contactBtn = (id, label) => `<button type="button" class="btn ghost sm" id="${id}" style="justify-self:start">${label}</button><input type="file" id="${id}File" accept=".vcf,text/vcard,text/x-vcard" ${id === 'impContacts' ? 'multiple' : ''} hidden>`;
+function wireContactFill(btnId, nameId, phoneId){
+  const b = document.getElementById(btnId); if (!b) return;
+  b.addEventListener('click', async () => {
+    const [c] = await getContacts(false, document.getElementById(btnId + 'File'));
+    if (!c) return;
+    document.getElementById(nameId).value = c.name;
+    if (c.phone) document.getElementById(phoneId).value = c.phone;
+  });
+}
+function addContactsToRoster(list){
+  let added = 0, skipped = 0;
+  list.forEach(c => {
+    if (D.players.some(p => p.name.toLowerCase() === c.name.toLowerCase())) { skipped++; return; }
+    if (D.players.length >= MAX_PLAYERS) { skipped++; return; }
+    D.players.push({ id: uid(), name: c.name, phone: c.phone, notes:'', regular:false, prefSeat:0 }); added++;
+  });
+  return { added, skipped };
+}
+
 /* ---------- sheets ---------- */
 function openSheet(html, onSubmit){
   closeSheet();
@@ -828,8 +878,9 @@ function checkinSheet(n, presetSeat, waitOnly){
   openSheet(`<h2>Check in player</h2>
     <div class="field"><label for="ciPlayer">Player</label><select id="ciPlayer">${avail.map(p => `<option value="${p.id}">${p.regular ? '★ ' : ''}${esc(p.name)}${p.prefSeat ? ' · seat ' + p.prefSeat : ''}</option>`).join('')}<option value="__new" ${firstPid === '__new' ? 'selected' : ''}>+ Create new player profile…</option></select></div>
     <div class="stack" id="ciNew" ${firstPid === '__new' ? '' : 'hidden'}>
-      <div class="field"><label for="ciName">Name</label><input id="ciName" autocomplete="off"></div>
-      <div class="grid2"><div class="field"><label for="ciPhone">Phone (optional)</label><input id="ciPhone" type="tel"></div>
+      ${contactBtn('ciFill', 'Fill from Contacts')}
+      <div class="field"><label for="ciName">Name</label><input id="ciName" autocomplete="name"></div>
+      <div class="grid2"><div class="field"><label for="ciPhone">Phone (optional)</label><input id="ciPhone" type="tel" autocomplete="tel"></div>
       <label class="row" style="cursor:pointer;align-self:end;min-height:44px"><input id="ciReg" type="checkbox" style="width:22px;min-height:22px"><span>Regular</span></label></div>
     </div>
     <div class="field"><label>Seat</label><input type="hidden" id="ciSeat" value="${seat0}"><div class="chips" data-pick="ciSeat" id="ciSeats">${seatChips(n, null, seat0)}</div></div>
@@ -855,6 +906,7 @@ function checkinSheet(n, presetSeat, waitOnly){
     if (amt) recordBuyin(n, pid, amt, lines);
     toast(seat ? `${pname(pid)} in seat ${seat}` : `${pname(pid)} added to waitlist`);
   });
+  wireContactFill('ciFill', 'ciName', 'ciPhone');
   document.getElementById('ciPlayer').addEventListener('change', e => {
     const v = e.target.value; document.getElementById('ciNew').hidden = v !== '__new';
     const s = waitOnly ? 0 : defaultSeat(n, v === '__new' ? null : v, presetSeat);
@@ -964,8 +1016,9 @@ function playerNightSheet(n, pid){
 function playerSheet(p){
   const editing = !!p; p = p || { name:'', phone:'', notes:'', regular:false, prefSeat:0 };
   openSheet(`<h2>${editing ? 'Edit player' : 'New player'}</h2>
-    <div class="field"><label for="pName">Name</label><input id="pName" value="${esc(p.name)}" required autocomplete="off"></div>
-    <div class="grid2"><div class="field"><label for="pPhone">Phone (optional)</label><input id="pPhone" type="tel" value="${esc(p.phone)}"></div>
+    ${editing ? '' : contactBtn('pFill', 'Fill from Contacts')}
+    <div class="field"><label for="pName">Name</label><input id="pName" value="${esc(p.name)}" required autocomplete="name"></div>
+    <div class="grid2"><div class="field"><label for="pPhone">Phone (optional)</label><input id="pPhone" type="tel" autocomplete="tel" value="${esc(p.phone)}"></div>
     <div class="field"><label for="pSeat">Preferred seat</label><select id="pSeat"><option value="0">No preference</option>${[1,2,3,4,5,6,7,8,9].map(s => `<option value="${s}" ${s === p.prefSeat ? 'selected' : ''}>Seat ${s}</option>`).join('')}</select></div></div>
     <div class="field"><label for="pNotes">Notes (optional)</label><input id="pNotes" value="${esc(p.notes)}" placeholder="Prefers Venmo"></div>
     <label class="row" style="cursor:pointer"><input id="pReg" type="checkbox" style="width:22px;min-height:22px" ${p.regular ? 'checked' : ''}><span>Regular (top of the waitlist)</span></label>
@@ -978,6 +1031,7 @@ function playerSheet(p){
     if (editing) Object.assign(p, data); else D.players.push({ id: uid(), ...data });
     toast(editing ? 'Saved' : 'Player added');
   });
+  wireContactFill('pFill', 'pName', 'pPhone');
   document.getElementById('pDel')?.addEventListener('click', () => {
     if (D.nights.some(n => n.entries.some(e => e.pid === p.id))) { document.getElementById('sheetErr').textContent = 'This player has money recorded on past nights, so they stay on the roster to keep reports correct.'; return; }
     confirmSheet('Remove player?', `${esc(p.name)} will be removed from the roster and from any seat lists.`, 'Remove', () => {
@@ -1037,6 +1091,28 @@ document.addEventListener('click', e => {
       return openSheet(`<h2>Seats at the table</h2><input type="hidden" id="scVal" value="${n.seats}"><div class="chips" data-pick="scVal">${[2,3,4,5,6,7,8,9,10].map(s => `<button type="button" class="chip" data-val="${s}" aria-pressed="${s === n.seats}">${s}</button>`).join('')}</div>
         <div class="small muted">Players in seats above the new count move to the waitlist.</div>${actions('Save')}`, () => { n.seats = parseInt(val('scVal')) || 9; });
     case 'newPlayer': return playerSheet();
+    case 'importContacts': {
+      if (canPickContacts()){
+        return getContacts(true).then(list => {
+          if (!list.length) return;
+          const r = addContactsToRoster(list); save(); render();
+          toast(`Added ${r.added} player${r.added === 1 ? '' : 's'}${r.skipped ? ` · skipped ${r.skipped} already on roster or over ${MAX_PLAYERS}` : ''}`);
+        });
+      }
+      openSheet(`<h2>Add from Contacts</h2>
+        <div class="small">Pick one or more contact cards and they'll be added to your roster with name and phone.</div>
+        <div class="preview small"><b>To send a contact here on iPhone:</b> open the Contacts app, open the person, tap <b>Share Contact</b>, then <b>Save to Files</b>. Then tap the button below and choose the saved cards.</div>
+        ${contactBtn('impContacts', 'Choose contact cards')}
+        <div class="small muted">To get the one-tap contact list instead: iPhone Settings → Apps → Safari → Advanced → Feature Flags → turn on <b>Contact Picker API</b>.</div>
+        <div class="grid2"><button class="btn ghost" type="button" data-cancel>Close</button><span></span></div>`, () => {});
+      document.getElementById('impContacts').addEventListener('click', async () => {
+        const list = await getContacts(true, document.getElementById('impContactsFile'));
+        if (!list.length){ document.getElementById('sheetErr').textContent = 'No contacts found in that file.'; return; }
+        const r = addContactsToRoster(list); save(); closeSheet(); render();
+        toast(`Added ${r.added} player${r.added === 1 ? '' : 's'}${r.skipped ? ` · skipped ${r.skipped}` : ''}`);
+      });
+      return;
+    }
     case 'newExpense': return expenseSheet();
     case 'closeNight': {
       const playing = nightPlayers(n).filter(pid => { const l = playerLedger(n, pid); return l.buyin && !l.checkedOut; }).map(pname);
