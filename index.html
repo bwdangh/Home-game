@@ -244,10 +244,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '14 · On books button';
+const APP_VERSION = '15 · No Zelle or Card';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
-const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
+const METHODS = ['Cash','Venmo','Cash App','Apple Pay','PayPal','Other']; // Dinesh doesn't take Zelle or Card from players
+const EXP_METHODS = [...METHODS, 'Card']; // the house can still pay its own expenses by card
+// Keep an older entry's method (e.g. Zelle) selectable so editing it doesn't silently change it.
+const withCur = (list, v) => !v || list.includes(v) ? list : [...list, v];
 const SETTLE = 'Settle at end';
 const NETTED = 'Netted from chips';
 const BOOKS = 'On books'; // house owes the player; paid on a later day, not out of tonight's money
@@ -586,7 +589,7 @@ function nightSeats(n){
 function nightClose(n){
   const t = nightTotals(n);
   const hp = n.housePlay || 0;
-  const msel = (id, v) => `<select id="${id}" aria-label="Paid with">${METHODS.map(m => `<option ${m === (v || 'Cash') ? 'selected' : ''}>${m}</option>`).join('')}</select>`;
+  const msel = (id, v) => `<select id="${id}" aria-label="Paid with">${withCur(EXP_METHODS, v).map(m => `<option ${m === (v || 'Cash') ? 'selected' : ''}>${m}</option>`).join('')}</select>`;
   const form = `<form id="closeForm" class="stack">
   <div class="split"><h2>Rake, tips &amp; costs</h2></div>
   <div class="closegrid">
@@ -612,7 +615,7 @@ function nightClose(n){
     : `<button class="btn ghost block" data-act="reopenNight">Reopen night</button>`}`;
 }
 
-const dealerLine = (amt, method) => `<div class="payline dline"><input class="dl-amt" inputmode="decimal" placeholder="Full amount" value="${amt}" aria-label="Amount"><select class="dl-method" aria-label="Paid with">${METHODS.map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}</select><button type="button" class="x" data-act="dlineDel" aria-label="Remove line">✕</button></div>`;
+const dealerLine = (amt, method) => `<div class="payline dline"><input class="dl-amt" inputmode="decimal" placeholder="Full amount" value="${amt}" aria-label="Amount"><select class="dl-method" aria-label="Paid with">${withCur(METHODS, method).map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}</select><button type="button" class="x" data-act="dlineDel" aria-label="Remove line">✕</button></div>`;
 const dealerBlock = d => `<div class="dealer stack">
   <div class="grid2"><div class="field"><label>Dealer</label><input class="d-name" value="${esc(d.name)}" placeholder="Name"></div>
   <div class="field"><label>Tips</label><input class="d-tips" inputmode="decimal" placeholder="0" value="${d.tips ? d.tips / 100 : ''}"></div></div>
@@ -993,11 +996,11 @@ function openSheet(html, onSubmit){
 }
 function closeSheet(){ if (sheetEl){ sheetEl.remove(); sheetEl = null; } }
 const actions = (label, danger) => `<div class="grid2"><button class="btn ghost" type="button" data-cancel>Cancel</button><button class="btn ${danger ? 'danger' : ''}" type="submit">${label}</button></div>`;
-const methodPicker = (id, v, extra = []) => `<div class="field"><label>Payment method</label><input type="hidden" id="${id}" value="${esc(v || 'Cash')}"><div class="chips" data-pick="${id}">${[...METHODS, ...extra].map(m => `<button type="button" class="chip" data-val="${m}" aria-pressed="${m === (v || 'Cash')}">${m}</button>`).join('')}</div></div>`;
+const methodPicker = (id, v, extra = []) => `<div class="field"><label>Payment method</label><input type="hidden" id="${id}" value="${esc(v || 'Cash')}"><div class="chips" data-pick="${id}">${withCur([...METHODS, ...extra], v).map(m => `<button type="button" class="chip" data-val="${m}" aria-pressed="${m === (v || 'Cash')}">${m}</button>`).join('')}</div></div>`;
 const val = id => document.getElementById(id)?.value.trim() ?? '';
 
 // Payment lines: one or more amount + method rows. A blank amount on a lone row means "the full amount".
-const payLine = (settle, amt, method, books) => `<div class="payline"><input class="pl-amt" inputmode="decimal" placeholder="Full amount" value="${amt}" aria-label="Amount"><select class="pl-method" aria-label="Payment method">${[...METHODS, ...(books ? [BOOKS] : []), ...(settle ? [SETTLE] : [])].map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}</select><button type="button" class="x" aria-label="Remove line">✕</button></div>`;
+const payLine = (settle, amt, method, books) => `<div class="payline"><input class="pl-amt" inputmode="decimal" placeholder="Full amount" value="${amt}" aria-label="Amount"><select class="pl-method" aria-label="Payment method">${withCur([...METHODS, ...(books ? [BOOKS] : []), ...(settle ? [SETTLE] : [])], method).map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}</select><button type="button" class="x" aria-label="Remove line">✕</button></div>`;
 const payLines = (label, settle, method, books) => `<div class="field" data-paylines data-settle="${settle ? 1 : 0}" data-books="${books ? 1 : 0}"><label>${label}</label><div class="lines stack">${payLine(settle, '', method || 'Cash', books)}</div>
   <button type="button" class="btn sm ghost" data-addline style="justify-self:start">+ Split between methods</button></div>`;
 function readLines(total){
@@ -1287,7 +1290,7 @@ function expenseSheet(x){
     <div class="field"><label for="xAmt">Amount</label><input id="xAmt" inputmode="decimal" value="${x.amount ? x.amount/100 : ''}" required></div></div>
     <div class="field"><label for="xCat">Category</label><select id="xCat">${CATEGORIES.map(c => `<option ${c === x.category ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
     <div class="field"><label for="xDesc">Description</label><input id="xDesc" value="${esc(x.desc)}" placeholder="New deck of cards"></div>
-    ${methodPicker('xMethod', x.method)}${actions(editing ? 'Save' : 'Add expense')}
+    ${methodPicker('xMethod', x.method, ['Card'])}${actions(editing ? 'Save' : 'Add expense')}
     ${editing ? '<button type="button" class="btn danger sm" id="xDel">Delete expense</button>' : ''}`, () => {
     const amount = toCents(val('xAmt')); if (!(amount > 0)) return 'Enter the amount.';
     const data = { date: val('xDate') || todayISO(), category: val('xCat'), desc: val('xDesc'), amount, method: val('xMethod') };
