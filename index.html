@@ -208,6 +208,24 @@ nav.tabs button[aria-current="true"]{color:var(--gold-hi)}
 .toast{background:var(--grad);color:#fff;box-shadow:var(--glow)}
 input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;box-shadow:0 0 0 3px rgba(139,123,255,.25)}
 .iconbtn{transition:background .2s ease}
+.bomb.on{border-color:rgba(236,72,153,.45);box-shadow:var(--glow)}
+.switch{appearance:none;flex:none;width:54px;height:32px;border-radius:999px;border:0;background:var(--surface-3);position:relative;cursor:pointer;transition:background .2s ease}
+.switch i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .2s ease;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.switch[aria-checked=true]{background:var(--grad)}
+.switch[aria-checked=true] i{transform:translateX(22px)}
+.bombnext{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.bombnext b{font-size:1.7rem}
+.linkbtn{background:none;border:0;padding:0;color:var(--gold-hi);font:inherit;cursor:pointer;text-decoration:underline}
+.alarm{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:rgba(8,8,20,.88);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.alarmbox{width:min(100%,380px);display:grid;gap:12px;text-align:center;padding:28px 22px;border-radius:24px;background:var(--grad);box-shadow:0 0 60px rgba(236,72,153,.55);color:#fff;animation:pulse 1s ease-in-out infinite alternate}
+.alarmbox h1{font-size:2.6rem;letter-spacing:.04em;margin:0}
+.alarmbox .boom{font-size:3.4rem;line-height:1}
+.alarmbox .num{font-size:1.2rem;font-weight:700;opacity:.9}
+.alarmbox p{margin:0}
+.alarmbox .btn{background:#fff;color:#2a1f6e;box-shadow:none}
+.alarmbox .btn.ghost{background:rgba(255,255,255,.18);color:#fff}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.03)}}
+@media (prefers-reduced-motion:reduce){.alarmbox{animation:none}}
 </style>
 
 </head>
@@ -218,7 +236,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '10 · Seat cash out';
+const APP_VERSION = '11 · Bomb pot alarm';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -453,7 +471,7 @@ function methodTable(byMethod){
 function nightMoney(n){
   const t = nightTotals(n);
   const ids = nightPlayers(n);
-  let html = `<div class="card stack">
+  let html = `${n.status === 'open' ? bombCard(n) : ''}<div class="card stack">
     <div class="stat">
       <div><div class="label">Buy-ins</div><div class="v">${money(t.buyin)}</div></div>
       <div><div class="label">Cash-outs</div><div class="v">${money(t.cashout)}</div></div>
@@ -1199,6 +1217,123 @@ function expenseSheet(x){
   document.getElementById('xDel')?.addEventListener('click', () => confirmSheet('Delete expense?', `${esc(x.desc || x.category)}, ${money(x.amount)}`, 'Delete', () => { D.expenses = D.expenses.filter(e => e.id !== x.id); }));
 }
 
+/* ---------- bomb pot alarm ---------- */
+// Alarms every 30 min from `first` until `until` (+ extraMin after "keep going"). Times past midnight belong to the next day.
+const bombOf = n => {
+  const b = n.bomb || (n.bomb = {});
+  for (const [k, v] of Object.entries({ on:false, first:'18:30', until:'00:00', extraMin:0 })) if (b[k] === undefined) b[k] = v;
+  b.fired = b.fired || {};
+  return b;
+};
+function bombTimes(n){
+  const b = bombOf(n), at = hm => new Date(`${n.date}T${hm}:00`);
+  const start = at(b.first); let end = at(b.until);
+  if (end <= start) end = new Date(end.getTime() + 864e5);
+  end = new Date(end.getTime() + b.extraMin * 6e4);
+  const out = []; for (let t = start.getTime(); t <= end.getTime(); t += 18e5) out.push(t);
+  return out;
+}
+const clock = t => new Date(t).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+const inMin = t => { const m = Math.max(0, Math.ceil((t - Date.now()) / 6e4)); return m >= 60 ? `in ${Math.floor(m/60)} h ${m%60} min` : `in ${m} min`; };
+function bombCard(n){
+  const b = bombOf(n), times = bombTimes(n), next = times.find(t => t > Date.now()), last = times[times.length - 1];
+  return `<div class="card stack bomb ${b.on ? 'on' : ''}">
+    <div class="split"><h2>💣 Bomb pot alarm</h2><button class="switch" data-act="bombToggle" role="switch" aria-checked="${b.on}" aria-label="Bomb pot alarm"><i></i></button></div>
+    ${b.on ? (next ? `<div class="bombnext"><span class="label">Next bomb pot</span><b class="num">${clock(next)}</b><span class="muted num" id="bombIn" data-t="${next}">${inMin(next)}</span></div>`
+      : `<div class="small">The last bomb pot (${clock(last)}) is done. <button class="btn sm" data-act="bombMore">Keep going every 30 min</button></div>`) : ''}
+    <div class="small muted">Every 30 min from ${clock(times[0])} to ${clock(last)} · <button class="linkbtn" data-act="bombSetTimes">Change times</button></div>
+    ${b.on ? `<button class="btn sm ghost" data-act="bombCal">📅 Add alarms to iPhone Calendar</button>
+    <div class="small muted">Calendar alerts ring even when the phone is locked. The in-app chime only plays while this app is open, so the screen stays on while the alarm is on.</div>` : ''}
+  </div>`;
+}
+
+let audioCtx = null, wakeLock = null, chimeTimer = null;
+function unlockAudio(){
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
+  try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch(e){}
+}
+function chime(){
+  if (!audioCtx) return; const t0 = audioCtx.currentTime;
+  [0, .18, .36, .9, 1.08, 1.26].forEach((d, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'triangle'; o.frequency.value = [880, 1175, 1568][i % 3];
+    g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.9, t0 + d + .02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + .5);
+    o.connect(g).connect(audioCtx.destination); o.start(t0 + d); o.stop(t0 + d + .55);
+  });
+}
+async function keepAwake(on){
+  try {
+    if (on && !wakeLock && navigator.wakeLock && !document.hidden){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+    if (!on && wakeLock){ await wakeLock.release(); wakeLock = null; }
+  } catch(e){ wakeLock = null; }
+}
+const bombNights = () => D.nights.filter(n => n.status === 'open' && n.bomb?.on);
+function stopAlarm(){ clearInterval(chimeTimer); chimeTimer = null; document.querySelector('.alarm')?.remove(); }
+function showAlarm(n, t){
+  stopAlarm();
+  const times = bombTimes(n), isLast = t === times[times.length - 1];
+  const el = document.createElement('div'); el.className = 'alarm'; el.setAttribute('role', 'alertdialog');
+  el.innerHTML = `<div class="alarmbox"><div class="boom">💣</div><h1>BOMB POT</h1><div class="num">${clock(t)}</div>
+    ${isLast ? `<p>That was the last scheduled bomb pot. Keep going every 30 min?</p>
+      <button class="btn" data-a="more">Keep going until ${clock(t + 2 * 36e5)}</button><button class="btn ghost" data-a="stop">Stop alarms</button>`
+    : `<button class="btn" data-a="ok">Got it</button>`}</div>`;
+  el.addEventListener('click', e => {
+    const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+    if (a === 'more') bombMore(n);
+    if (a === 'stop'){ n.bomb.on = false; keepAwake(false); }
+    stopAlarm(); save(); if (!UI.locked) render();
+  });
+  document.body.appendChild(el);
+  chime(); let rings = 1; chimeTimer = setInterval(() => { if (++rings > 6) clearInterval(chimeTimer); else chime(); }, 5000);
+}
+function bombMore(n){
+  const b = bombOf(n), times = bombTimes(n), last = times[times.length - 1];
+  b.on = true; b.extraMin += Math.max(120, Math.ceil((Date.now() - last) / 18e5) * 30 + 90);
+  bombTimes(n).filter(t => t <= Date.now()).forEach(t => b.fired[t] = 1);
+  toast(`Alarms continue until ${clock(bombTimes(n).slice(-1)[0])}`);
+}
+function bombTick(){
+  const now = Date.now();
+  bombNights().forEach(n => {
+    bombTimes(n).filter(t => t <= now && !n.bomb.fired[t]).forEach(t => {
+      n.bomb.fired[t] = 1; save();
+      if (now - t < 5 * 6e4) showAlarm(n, t); // skip old alarms missed while the app was closed
+    });
+  });
+  const el = document.getElementById('bombIn');
+  if (el){ const t = +el.dataset.t; if (t <= now){ if (!sheetEl) render(); } else el.textContent = inMin(t); }
+  keepAwake(bombNights().length > 0);
+}
+setInterval(bombTick, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) bombTick(); });
+
+function bombTimesSheet(n){
+  const b = bombOf(n);
+  openSheet(`<div class="label">Bomb pot alarm</div><h2>Alarm times</h2>
+    <div class="grid2"><div class="field"><label for="bFirst">First bomb pot</label><input id="bFirst" type="time" value="${b.first}"></div>
+    <div class="field"><label for="bUntil">Last one at</label><input id="bUntil" type="time" value="${b.until}"></div></div>
+    <div class="small muted">Then every 30 minutes. At the last one the app asks if you want to keep going.</div>
+    ${actions('Save times')}`, () => {
+    const f = val('bFirst'), u = val('bUntil'); if (!f || !u) return 'Pick both times.';
+    b.first = f; b.until = u; b.extraMin = 0; toast('Times saved');
+  });
+}
+function bombCalendar(n){
+  const pad = x => String(x).padStart(2, '0');
+  const ical = t => { const d = new Date(t); return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`; };
+  const times = bombTimes(n).filter(t => t > Date.now() - 6e4);
+  if (!times.length) return toast('No bomb pots left tonight');
+  const stamp = ical(Date.now());
+  const ev = times.map((t, i) => ['BEGIN:VEVENT', `UID:bomb-${n.id}-${t}@home-game`, `DTSTAMP:${stamp}`, `DTSTART:${ical(t)}`, 'DURATION:PT5M',
+    `SUMMARY:💣 Bomb pot${i === times.length - 1 ? ' (last one)' : ''}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Bomb pot', 'TRIGGER:PT0S', 'END:VALARM', 'END:VEVENT'].join('\r\n'));
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Home Game Ledger//Bomb pots//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', ...ev, 'END:VCALENDAR'].join('\r\n');
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'bomb-pots.ics'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast(`Opening ${times.length} bomb pot alarms · tap Add All`);
+}
+
 /* ---------- events ---------- */
 document.addEventListener('toggle', e => { const h = e.target.dataset?.hist; if (h) e.target.open ? UI.histOpen.add(h) : UI.histOpen.delete(h); }, true);
 document.addEventListener('click', e => {
@@ -1218,6 +1353,12 @@ document.addEventListener('click', e => {
   if (d.playerNight) return playerNightSheet(n, d.playerNight);
   if (d.editEntry){ const x = n.entries.find(y => y.id === d.editEntry); if (x) return x.kind === 'buyin' ? editBuyinSheet(n, x) : editEntrySheet(n, x); return; }
   switch (d.act){
+    case 'bombToggle': { unlockAudio(); const b = bombOf(n); b.on = !b.on;
+      if (b.on) bombTimes(n).filter(t => t <= Date.now()).forEach(t => b.fired[t] = 1); // don't ring for times already passed
+      keepAwake(b.on); save(); render(); return toast(b.on ? 'Bomb pot alarm on' : 'Bomb pot alarm off'); }
+    case 'bombSetTimes': return bombTimesSheet(n);
+    case 'bombCal': return bombCalendar(n);
+    case 'bombMore': unlockAudio(); bombMore(n); save(); return render();
     case 'newNight':
       return openSheet(`<h2>Set up a game night</h2>${nightFields()}${actions('Create night')}`, () => {
         const nn = { id: uid(), ...readNightFields(), status:'open', rsvps:[], entries:[], rake:0, tips:0, expense:0, expenseNote:'', housePlay:0 };
