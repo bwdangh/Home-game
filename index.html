@@ -181,6 +181,8 @@ tr.tot td{border-bottom:0;font-weight:800}
 .seatrow{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid transparent;border-radius:14px;padding:9px 12px;width:100%;text-align:left;cursor:pointer;color:var(--ink)}
 .seatrow.filled{background:linear-gradient(90deg,var(--pcbg),transparent),var(--surface-2);border-color:var(--pcline)}
 .seatrow .grow{flex:1;min-width:0}
+.seatrow .seatname{display:flex;align-items:center;gap:10px;flex:1;min-width:0;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer;min-height:40px}
+.seatrow .seatout{flex:none;padding:6px 12px;min-height:34px}
 .payline{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) 40px;gap:8px;align-items:center}
 .payline .x{background:var(--surface-2);border:0;border-radius:10px;height:40px;color:var(--muted);cursor:pointer}
 .preview{background:var(--surface-2);border-radius:14px;padding:12px;display:grid;gap:5px;font-size:.92rem}
@@ -216,7 +218,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '9 · Edit buy-ins';
+const APP_VERSION = '10 · Seat cash out';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -307,7 +309,7 @@ function methodTotals(entries){
 function seating(n){
   const rs = n.rsvps.map(r => ({...r, p: player(r.pid)})).filter(r => r.p);
   const seated = rs.filter(r => r.seat && r.seat <= n.seats).sort((a,b) => a.seat - b.seat);
-  const waitlist = rs.filter(r => !(r.seat && r.seat <= n.seats)).sort((a,b) => (b.p.regular - a.p.regular) || (a.t - b.t));
+  const waitlist = rs.filter(r => !(r.seat && r.seat <= n.seats) && !playerLedger(n, r.pid).checkedOut).sort((a,b) => (b.p.regular - a.p.regular) || (a.t - b.t));
   return { seated, waitlist };
 }
 const takenSeats = (n, exceptPid) => n.rsvps.filter(r => r.pid !== exceptPid && r.seat && r.seat <= n.seats).map(r => r.seat);
@@ -503,7 +505,7 @@ function playerCard(n, pid){
   return `<div class="card player" style="${colorOf(n, pid)}">
     <div class="split">
       <button class="namebtn" data-player-night="${pid}" aria-label="Edit ${esc(pname(pid))}">${seat ? `<span class="seat">${seat}</span>` : '<span class="seat open">–</span>'}<h2>${esc(pname(pid))}</h2></button>
-      ${!seat ? '<span class="pill wait">Waitlist</span>' : p?.regular ? '<span class="pill reg">Regular</span>' : ''}
+      ${!seat ? (l.checkedOut ? '<span class="pill">Left table</span>' : '<span class="pill wait">Waitlist</span>') : p?.regular ? '<span class="pill reg">Regular</span>' : ''}
     </div>
     <div class="minis num">
       <div><div class="label">Buy-in${l.buyins > 1 ? 's ×' + l.buyins : ''}</div><div class="v">${money(l.buyin)}</div></div>
@@ -527,7 +529,7 @@ function nightSeats(n){
     const s = i + 1, r = bySeat[s];
     if (!r) return `<button class="seatrow" data-act="checkin" data-seat="${s}"><span class="seat open">${s}</span><span class="grow muted">Open seat</span><span class="small" style="color:var(--gold-hi)">+ Seat a player</span></button>`;
     const l = playerLedger(n, r.pid);
-    return `<button class="seatrow filled" style="${colorOf(n, r.pid)}" data-player-night="${r.pid}"><span class="seat">${s}</span><span class="grow"><b>${esc(r.p.name)}</b> ${r.p.regular ? '<span class="pill reg">Regular</span>' : ''}</span><span class="small num muted">${l.checkedOut ? 'Out' : l.buyin ? money(l.buyin) : ''}</span></button>`;
+    return `<div class="seatrow filled" style="${colorOf(n, r.pid)}"><button class="seatname" data-player-night="${r.pid}" aria-label="Seat ${s}, ${esc(r.p.name)}"><span class="seat">${s}</span><span class="grow"><b>${esc(r.p.name)}</b> ${r.p.regular ? '<span class="pill reg">Regular</span>' : ''}</span></button>${l.buyin && !l.checkedOut ? `<button class="btn sm ghost seatout" data-act="cashout" data-pid="${r.pid}">Cash out</button>` : ''}<span class="small num muted">${l.checkedOut ? 'Out' : l.buyin ? money(l.buyin) : ''}</span></div>`;
   }).join('');
   return `<div class="card stack">
     <div class="split"><h2>Table</h2><button class="btn sm ghost" data-act="seatCount">${n.seats} seats ▾</button></div>
@@ -1036,7 +1038,9 @@ function cashoutSheet(n, pid){
       n.entries.push({ id: uid(), pid, kind:'cpay', amount: offset, method: NETTED, t: t+2 });
     }
     r.lines.forEach((x, i) => n.entries.push({ id: uid(), pid, kind: net >= 0 ? 'cpay' : 'bpay', amount: x.amount, method: x.method, t: t + 3 + i }));
-    toast(net > 0 && r.paid < net ? `House owes ${pname(pid)} ${money(net - r.paid)}` : `${pname(pid)} cashed out`);
+    // Cashing out frees the seat so the next player can sit right away.
+    const rv = rsvp(n, pid), freed = rv?.seat && rv.seat <= n.seats ? rv.seat : 0; if (rv) rv.seat = null;
+    toast(net > 0 && r.paid < net ? `House owes ${pname(pid)} ${money(net - r.paid)}` : `${pname(pid)} cashed out${freed ? ` · seat ${freed} open` : ''}`);
   });
   const amt = document.getElementById('mAmt');
   const update = () => {
