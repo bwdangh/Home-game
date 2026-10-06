@@ -230,6 +230,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 .pill.books{background:rgba(192,132,252,.16);color:#d8b4fe}
 .pill.house{background:var(--grad);color:#fff}
 .badge.books{background:rgba(192,132,252,.14);color:#e9d5ff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.closegrid .dealers{grid-column:1/-1}
+.dealers .dealer{border-top:1px solid var(--line);padding-top:10px}
+.dealers .dealer:first-child{border-top:0;padding-top:0}
 </style>
 
 </head>
@@ -240,7 +243,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '12 · House math';
+const APP_VERSION = '13 · Two dealers';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -261,6 +264,7 @@ function migrate(){
     if (Array.isArray(n.nightExpenses)){ n.expense = (n.expense || 0) + n.nightExpenses.reduce((s,x) => s + x.amount, 0); n.expenseNote = n.expenseNote || n.nightExpenses.map(x => x.desc).join(', '); delete n.nightExpenses; }
     n.expense ||= 0; n.housePlay ||= 0; n.expenseNote ||= ''; n.seats ||= 9;
     n.rsvps ||= []; n.entries ||= [];
+    if (!n.dealers) n.dealers = n.tips ? [{ name:'Dealer 1', tips: n.tips, pays: [{ amount: n.tips, method: n.tipsMethod || 'Cash' }] }] : [];
   });
   D.players.forEach(p => { if (p.prefSeat === undefined) p.prefSeat = 0; });
   D.bookPays ||= [];
@@ -322,7 +326,7 @@ function nightTotals(n){
     cashout: sum(all, l => l.cashout), cpaid: sum(all, l => l.cpaid),
     owesHouse: sum(L, l => Math.max(0, l.owesHouse)),
     houseOwes: sum(L, l => Math.max(0, l.houseOwes)),
-    rake: n.rake || 0, tips: n.tips || 0, nightExp: n.expense || 0,
+    rake: n.rake || 0, tips: sum(n.dealers || [], d => d.tips), nightExp: n.expense || 0,
     // House play is the house player's own result when they sat in tonight; otherwise the amount typed on the Settle tab.
     housePlay: H ? (H.checkedOut ? H.result : 0) : (n.housePlay || 0),
     onBooks: sum(n.entries.filter(x => x.kind === 'cpay' && x.method === BOOKS), x => x.amount),
@@ -586,8 +590,9 @@ function nightClose(n){
   <div class="split"><h2>Rake, tips &amp; costs</h2></div>
   <div class="closegrid">
     <div class="card"><h3>Rake</h3><div class="field"><label for="rake">Total for the night</label><input id="rake" inputmode="decimal" placeholder="0" value="${n.rake ? n.rake/100 : ''}"></div></div>
-    <div class="card"><h3>Dealer tips</h3><div class="small muted">Paid by players, not the house.</div><div class="field"><label for="tips">Total tips</label><input id="tips" inputmode="decimal" placeholder="0" value="${n.tips ? n.tips/100 : ''}"></div>
-      <div class="field"><label for="tipsM">Paid with</label>${msel('tipsM', n.tipsMethod)}</div></div>
+    <div class="card dealers"><h3>Dealer tips</h3><div class="small muted">Paid by players, not the house. Leave the amount on a single payment line empty to pay the full tips.</div>
+      <div class="stack" id="dealerList">${(n.dealers?.length ? n.dealers : (D.dealerNames || ['Dealer 1','Dealer 2']).map(name => ({ name, tips:0, pays:[] }))).map(dealerBlock).join('')}</div>
+      <button type="button" class="btn sm ghost" data-act="dealerAdd" style="justify-self:start">+ Add dealer</button></div>
     <div class="card"><h3>Tonight's expenses</h3><div class="field"><label for="nexp">Food, drinks, etc.</label><input id="nexp" inputmode="decimal" placeholder="0" value="${n.expense ? n.expense/100 : ''}"></div>
       <div class="field"><label for="nexpNote">What for</label><input id="nexpNote" placeholder="Pizza" value="${esc(n.expenseNote)}"></div>
       <div class="field"><label for="nexpM">Paid with</label>${msel('nexpM', n.expenseMethod)}</div></div>
@@ -606,13 +611,36 @@ function nightClose(n){
     : `<button class="btn ghost block" data-act="reopenNight">Reopen night</button>`}`;
 }
 
+const dealerLine = (amt, method) => `<div class="payline dline"><input class="dl-amt" inputmode="decimal" placeholder="Full amount" value="${amt}" aria-label="Amount"><select class="dl-method" aria-label="Paid with">${METHODS.map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}</select><button type="button" class="x" data-act="dlineDel" aria-label="Remove line">✕</button></div>`;
+const dealerBlock = d => `<div class="dealer stack">
+  <div class="grid2"><div class="field"><label>Dealer</label><input class="d-name" value="${esc(d.name)}" placeholder="Name"></div>
+  <div class="field"><label>Tips</label><input class="d-tips" inputmode="decimal" placeholder="0" value="${d.tips ? d.tips / 100 : ''}"></div></div>
+  <div class="field"><label>Paid with</label><div class="dlines stack">${(d.pays.length ? d.pays : [{ amount:0, method:'Cash' }]).map((x, i, a) => dealerLine(a.length === 1 && x.amount === d.tips ? '' : x.amount ? x.amount / 100 : '', x.method)).join('')}</div></div>
+  <div class="row"><button type="button" class="btn sm ghost" data-act="dealerSplit">+ Split between methods</button><button type="button" class="btn sm ghost" data-act="dealerDel">Remove dealer</button></div>
+</div>`;
+function readDealers(){
+  const out = [];
+  for (const el of document.querySelectorAll('#dealerList .dealer')){
+    const name = el.querySelector('.d-name').value.trim(), raw = el.querySelector('.d-tips').value.trim(), tips = raw === '' ? 0 : toCents(raw);
+    if (!(tips >= 0)) return { err: 'Dealer tips must be a number.' };
+    const rows = [...el.querySelectorAll('.dline')].map(r => ({ raw: r.querySelector('.dl-amt').value.trim(), method: r.querySelector('.dl-method').value }));
+    if (rows.length === 1 && rows[0].raw === '') rows[0].raw = String(tips / 100);
+    const pays = rows.filter(r => r.raw !== '').map(r => ({ amount: toCents(r.raw), method: r.method }));
+    if (pays.some(x => !(x.amount >= 0))) return { err: 'Each tip payment must be a number.' };
+    const paid = sum(pays, x => x.amount);
+    if (paid > tips) return { err: `${name || 'A dealer'}'s payments add up to ${money(paid)}, more than the ${money(tips)} in tips.` };
+    if (tips || name) out.push({ name: name || `Dealer ${out.length + 1}`, tips, pays: pays.filter(x => x.amount > 0) });
+  }
+  return { dealers: out };
+}
+
 // End-of-night settlement: what should be in hand per payment method, who is still owed, and whether the table balances.
 function settlement(n){
   const t = nightTotals(n);
   const m = {};
   const row = k => m[k] ||= { in:0, out:0, tips:0, exp:0 };
   Object.entries(t.byMethod).forEach(([k,v]) => { row(k).in += v.in; row(k).out += v.out; });
-  if (t.tips) row(n.tipsMethod || 'Cash').tips += t.tips;
+  (n.dealers || []).forEach(d => d.pays.forEach(x => row(x.method).tips += x.amount));
   if (t.nightExp) row(n.expenseMethod || 'Cash').exp += t.nightExp;
   Object.values(m).forEach(r => r.have = r.in - r.out - r.tips - r.exp);
   const L = nightPlayers(n).filter(pid => pid !== t.housePid).map(pid => [pid, playerLedger(n, pid)]);
@@ -649,6 +677,7 @@ function settlementCard(n){
         : '<div class="small muted">No money has changed hands yet.</div>'}
       ${rows.length ? `<div class="methodrow"><span class="m">Total in hand</span><span class="amt">${money(sum(rows, ([,r]) => r.have))}</span></div>` : ''}
     </div>
+    ${(n.dealers || []).length ? `<div class="stack" style="gap:6px"><h3>Dealer tips · paid by players</h3><div class="owelist">${n.dealers.map(d => { const paid = sum(d.pays, x => x.amount); return `<div class="o"><span>${esc(d.name)}<span class="small muted"> · ${d.pays.map(x => `${esc(x.method)} ${money(x.amount)}`).join(' + ') || 'not paid yet'}${paid < d.tips ? ` · <span class="owes-player">still owed ${money(d.tips - paid)}</span>` : ''}</span></span><b class="num">${money(d.tips)}</b></div>`; }).join('')}</div></div>` : ''}
     ${s.books.length ? `<div class="stack" style="gap:6px"><h3 class="books">On books · pay later</h3><div class="owelist">${s.books.map(([pid,a]) => `<div class="o"><span>${esc(pname(pid))}</span><b class="books num">${money(a)}</b></div>`).join('')}</div><div class="small muted">Not paid out tonight, so it isn't taken out of the cash above. Record the payoff on the player's profile.</div></div>` : ''}
     <div class="grid2" style="gap:10px">
       <div class="stack" style="gap:6px"><h3 class="owes-house">Owed to the house</h3>
@@ -724,6 +753,7 @@ function nightSessions(cur){
           <span class="owes-player">House owes</span><span class="v owes-player">${money(t.houseOwes)}</span>
           ${t.onBooks ? `<span class="books">On books</span><span class="v books">${money(t.onBooks)}</span>` : ''}
           <span class="muted">Dealer tips (paid by players)</span><span class="v muted">${money(t.tips)}</span>
+          ${(n.dealers || []).map(d => `<span class="muted small">· ${esc(d.name)}</span><span class="v muted small">${money(d.tips)}</span>`).join('')}
         </div>
         ${n.rules ? `<div class="small muted">House rules: ${esc(n.rules)}</div>` : ''}
         ${isCur ? '' : `<button class="btn ghost block" data-open-night="${n.id}">Open this session</button>`}
@@ -1399,6 +1429,10 @@ document.addEventListener('click', e => {
     case 'bombToggle': { unlockAudio(); const b = bombOf(n); b.on = !b.on;
       if (b.on) bombTimes(n).filter(t => t <= Date.now()).forEach(t => b.fired[t] = 1); // don't ring for times already passed
       keepAwake(b.on); save(); render(); return toast(b.on ? 'Bomb pot alarm on' : 'Bomb pot alarm off'); }
+    case 'dealerAdd': document.getElementById('dealerList').insertAdjacentHTML('beforeend', dealerBlock({ name:'', tips:0, pays:[] })); return;
+    case 'dealerSplit': t.closest('.dealer').querySelector('.dlines').insertAdjacentHTML('beforeend', dealerLine('', 'Cash')); return;
+    case 'dealerDel': t.closest('.dealer').remove(); return;
+    case 'dlineDel': { const box = t.closest('.dlines'); if (box.children.length > 1) t.closest('.dline').remove(); else box.querySelector('.dl-amt').value = ''; return; }
     case 'bombSetTimes': return bombTimesSheet(n);
     case 'bombCal': return bombCalendar(n);
     case 'bombMore': unlockAudio(); bombMore(n); save(); return render();
@@ -1477,12 +1511,15 @@ document.addEventListener('click', e => {
 });
 function readCloseForm(n){
   const g = id => { const el = document.getElementById(id); if (!el) return null; const v = el.value.trim(); return v === '' ? 0 : toCents(v); };
-  const rake = g('rake'), tips = g('tips'), exp = g('nexp'), hp = g('hp');
+  const rake = g('rake'), exp = g('nexp'), hp = g('hp');
   if (rake === null) return null; // close form not on screen
-  if (![rake, tips, exp, hp].every(v => v >= 0)) return 'Rake, tips, expenses and house play must be numbers.';
-  n.rake = rake; n.tips = tips; n.expense = exp; n.expenseNote = val('nexpNote');
+  if (![rake, exp, hp].every(v => v >= 0)) return 'Rake, expenses and house play must be numbers.';
+  const dr = readDealers(); if (dr.err) return dr.err;
+  n.dealers = dr.dealers; n.tips = sum(dr.dealers, d => d.tips);
+  if (dr.dealers.length) D.dealerNames = dr.dealers.map(d => d.name);
+  n.rake = rake; n.expense = exp; n.expenseNote = val('nexpNote');
   n.housePlay = val('hpSign') === '-' ? -hp : hp;
-  n.tipsMethod = val('tipsM') || 'Cash'; n.expenseMethod = val('nexpM') || 'Cash';
+  n.expenseMethod = val('nexpM') || 'Cash';
   const cc = val('cashCount'); n.cashCounted = cc === '' ? null : (toCents(cc) >= 0 ? toCents(cc) : n.cashCounted);
   return null;
 }
