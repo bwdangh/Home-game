@@ -234,6 +234,39 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 .dealers .dealer{border-top:1px solid var(--line);padding-top:10px}
 .dealers .dealer:first-child{border-top:0;padding-top:0}
 .booksbtn{color:#e9d5ff;border:1px solid rgba(192,132,252,.45)}
+.pcard{position:relative;box-shadow:inset 5px 0 0 var(--pc);background:linear-gradient(100deg,color-mix(in srgb,var(--pc) 16%,transparent),transparent 60%),var(--surface);border-color:color-mix(in srgb,var(--pc) 35%,var(--line));padding:14px 14px 14px 18px}
+.pcard .row{align-items:center;gap:12px;flex-wrap:nowrap}
+.av{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:.95rem;color:#0b0d17;background:linear-gradient(135deg,var(--pc),color-mix(in srgb,var(--pc) 55%,#fff));box-shadow:0 0 0 3px color-mix(in srgb,var(--pc) 25%,transparent)}
+.pcard .grow{flex:1;display:grid;gap:3px;min-width:0}
+.pcard .pname{font-size:1.05rem}
+.pcard .tags{display:flex;flex-wrap:wrap;gap:5px}
+.pill.reg{background:linear-gradient(135deg,rgba(109,93,252,.35),rgba(236,72,153,.3));color:#f5d0fe}
+.pill.seatpref{background:color-mix(in srgb,var(--pc) 22%,transparent);color:var(--pc)}
+.pcard .nights{flex:none;display:grid;justify-items:end;line-height:1.1;color:var(--muted)}
+.pcard .nights b{font-size:1.3rem;color:var(--ink)}
+.due{flex:none;display:grid;justify-items:end;line-height:1.1;padding:8px 12px;border-radius:14px;color:#fff}
+.due .label{font-size:.62rem;color:rgba(255,255,255,.85)}
+.due b{font-size:1.25rem}
+.due .small{color:rgba(255,255,255,.8);font-size:.7rem}
+.due.in{background:linear-gradient(135deg,#f59e0b,#ef4444 60%,#ec4899);box-shadow:0 8px 22px -8px rgba(239,68,68,.7)}
+.due.out{background:linear-gradient(135deg,#06b6d4,#6366f1);box-shadow:0 8px 22px -8px rgba(99,102,241,.7)}
+.pcard.owes{border-color:rgba(251,113,133,.65);box-shadow:inset 5px 0 0 var(--pc),0 0 0 1px rgba(251,113,133,.35),0 12px 30px -14px rgba(239,68,68,.8)}
+.pcard.owed{border-color:rgba(76,195,255,.55)}
+.booksboard{display:grid;gap:12px;background:radial-gradient(120% 140% at 0% 0%,rgba(245,158,11,.22),transparent 55%),radial-gradient(120% 140% at 100% 0%,rgba(236,72,153,.25),transparent 55%),var(--surface);border-color:rgba(244,114,182,.45)}
+.bookstats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bs{border-radius:16px;padding:12px;color:#fff}
+.bs .label{color:rgba(255,255,255,.85)}
+.bs .v{font-size:1.5rem;font-weight:800}
+.bs.in{background:linear-gradient(135deg,#f59e0b,#ef4444 60%,#ec4899)}
+.bs.out{background:linear-gradient(135deg,#06b6d4,#6366f1)}
+.booklist{display:grid;gap:6px}
+.bookrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:8px 10px;color:var(--ink);cursor:pointer}
+.bookrow .av{width:34px;height:34px;font-size:.8rem}
+.bookrow .grow{flex:1;display:grid;min-width:0}
+.bookrow .grow .small{color:var(--muted)}
+.bookrow .amt{font-size:1.05rem}
+.bookrow .amt.in{color:#fb923c}
+.bookrow .amt.out{color:var(--owes-player)}
 </style>
 
 </head>
@@ -244,7 +277,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '16 · On books both ways';
+const APP_VERSION = '17 · Colorful roster';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Cash App','Apple Pay','PayPal','Other']; // Dinesh doesn't take Zelle or Card from players
@@ -801,10 +834,29 @@ function viewPlayers(){
   const head = `<div class="grow"><h1>Roster</h1><div class="sub num">${ps.length} of ${MAX_PLAYERS} players · ${ps.filter(p => p.regular).length} regulars</div></div>
     <button class="btn sm ghost" data-act="importContacts" ${ps.length >= MAX_PLAYERS ? 'disabled' : ''}>Contacts</button><button class="btn sm" data-act="newPlayer" ${ps.length >= MAX_PLAYERS ? 'disabled' : ''}>+ Player</button>`;
   if (!ps.length) return [head, `<div class="card empty"><div class="suits">♠♥♦♣</div><div><h2>Build your roster</h2><p class="small">Create a profile for each player, up to 40. Mark regulars so they move up the waitlist, and set a preferred seat.</p></div><div class="row" style="justify-content:center"><button class="btn" data-act="importContacts">Add from Contacts</button><button class="btn ghost" data-act="newPlayer">Type a player</button></div></div>`];
-  return [head, ps.map(p => {
+  const owing = ps.map(p => [p, booksOwing(p.id), booksOwed(p.id)]).filter(([,i,o]) => i > 0 || o > 0).sort((a,b) => (b[1] - a[1]) || (b[2] - a[2]));
+  const totIn = sum(owing, x => x[1]), totOut = sum(owing, x => x[2]);
+  const initials = name => name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+  const books = owing.length ? `<div class="card booksboard">
+    <div class="split"><h2>📒 On books</h2><span class="small num">${owing.length} player${owing.length === 1 ? '' : 's'}</span></div>
+    <div class="bookstats">
+      <div class="bs in"><div class="label">Players owe you</div><div class="v num">${money(totIn)}</div></div>
+      <div class="bs out"><div class="label">You owe players</div><div class="v num">${money(totOut)}</div></div>
+    </div>
+    <div class="booklist">${owing.map(([p,i,o]) => `<button class="bookrow" data-edit-player="${p.id}"><span class="av" style="--pc:${COLORS[ps.indexOf(p) % COLORS.length]}">${esc(initials(p.name))}</span><span class="grow"><b>${esc(p.name)}</b><span class="small">${i > 0 ? 'owes you' : 'you owe them'}</span></span><b class="amt num ${i > 0 ? 'in' : 'out'}">${money(i > 0 ? i : o)}</b></button>`).join('')}</div>
+    <div class="small muted">Tap a player to record a payment.</div>
+  </div>` : '';
+  return [head, books + ps.map((p, idx) => {
     const nights = D.nights.filter(n => n.entries.some(e => e.pid === p.id));
-    return `<button class="card tap" data-edit-player="${p.id}"><div class="row"><span class="grow"><b>${esc(p.name)}</b> ${housePill(p.id)} ${p.regular ? '<span class="pill reg">Regular</span>' : ''} ${booksPills(p.id)}<div class="small muted">${esc([p.prefSeat ? 'Prefers seat ' + p.prefSeat : '', p.phone, p.notes].filter(Boolean).join(' · ') || ' ')}</div></span>
-      <span class="small num muted" style="text-align:right">${nights.length} night${nights.length === 1 ? '' : 's'}</span></div></button>`;
+    const i = booksOwing(p.id), o = booksOwed(p.id);
+    return `<button class="card tap pcard ${i > 0 ? 'owes' : o > 0 ? 'owed' : ''}" style="--pc:${COLORS[idx % COLORS.length]}" data-edit-player="${p.id}"><div class="row">
+      <span class="av">${esc(initials(p.name))}</span>
+      <span class="grow"><b class="pname">${esc(p.name)}</b><span class="tags">${housePill(p.id)}${p.regular ? '<span class="pill reg">★ Regular</span>' : ''}${p.prefSeat ? `<span class="pill seatpref">Seat ${p.prefSeat}</span>` : ''}</span>
+        <span class="small muted">${esc([p.phone, p.notes].filter(Boolean).join(' · ') || ' ')}</span></span>
+      ${i > 0 ? `<span class="due in"><span class="label">Owes</span><b class="num">${money(i)}</b><span class="small">on books</span></span>`
+        : o > 0 ? `<span class="due out"><span class="label">You owe</span><b class="num">${money(o)}</b><span class="small">on books</span></span>`
+        : `<span class="nights num"><b>${nights.length}</b><span class="small">night${nights.length === 1 ? '' : 's'}</span></span>`}
+    </div></button>`;
   }).join('')];
 }
 
