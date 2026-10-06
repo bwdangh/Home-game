@@ -233,6 +233,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 .closegrid .dealers{grid-column:1/-1}
 .dealers .dealer{border-top:1px solid var(--line);padding-top:10px}
 .dealers .dealer:first-child{border-top:0;padding-top:0}
+.booksbtn{color:#e9d5ff;border:1px solid rgba(192,132,252,.45)}
 </style>
 
 </head>
@@ -243,7 +244,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '13 · Two dealers';
+const APP_VERSION = '14 · On books button';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Zelle','Cash App','Apple Pay','PayPal','Card','Other'];
@@ -1096,6 +1097,7 @@ function cashoutSheet(n, pid){
     <div class="small muted num">Bought in ${money(l.buyin)} · paid ${money(l.bpaid)}${owed ? ` · <span class="owes-house">settle at end ${money(owed)}</span>` : ''}</div>
     <div class="field"><label for="mAmt">Chips cashed out</label><input id="mAmt" inputmode="decimal" placeholder="0 if they busted" required></div>
     <div class="preview num" id="coPrev"><span class="muted">Enter the chip count to see who pays whom.</span></div>
+    <button type="button" class="btn ghost block booksbtn" id="coBooks" hidden>📒 Put the payout On books</button>
     <div id="coLines">${payLines('Paid how', true, 'Cash', true)}</div>
     ${actions('Cash out')}`, () => {
     const raw = val('mAmt'); const chips = toCents(raw); if (raw === '' || !(chips >= 0)) return 'Enter the chips cashed out (0 if they busted).';
@@ -1129,8 +1131,13 @@ function cashoutSheet(n, pid){
       <div class="split small muted"><span>Night result</span><span class="${res >= 0 ? 'win' : 'loss'}">${money(res, true)}</span></div>`;
     lbl.textContent = net > 0 ? 'How the house is paying' : net < 0 ? 'How the player is paying the balance' : 'Paid how';
     document.getElementById('coLines').hidden = net === 0;
+    document.getElementById('coBooks').hidden = !(net > 0);
   };
   amt.addEventListener('input', update);
+  document.getElementById('coBooks').addEventListener('click', () => {
+    sheetEl.querySelector('#coLines .lines').innerHTML = payLine(true, '', BOOKS, true);
+    sheetEl.querySelector('#coLines [data-paylines] > label').textContent = 'Paid how · On books means the house pays them later';
+  });
 }
 
 function balanceSheet(n, pid, kind){
