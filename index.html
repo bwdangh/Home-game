@@ -282,7 +282,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '18 · Softer roster';
+const APP_VERSION = '19 · This session only';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Cash App','Apple Pay','PayPal','Other']; // Dinesh doesn't take Zelle or Card from players
@@ -766,16 +766,17 @@ function settlementCard(n){
 function nightSessions(cur){
   const list = [...D.nights].sort((a,b) => (b.date + b.start).localeCompare(a.date + a.start));
   const all = list.map(n => [n, nightTotals(n)]);
-  const closed = all.filter(([n]) => n.status === 'closed');
+  // Only tonight's numbers here; totals across nights live in Reports.
+  const ct = nightTotals(cur), past = list.length - 1;
   const head = `<div class="card stack">
-    <div class="split"><h2>All sessions</h2><span class="small muted num">${list.length} hosted</span></div>
+    <div class="split"><h2>This session</h2><span class="pill ${cur.status}">${cur.status === 'open' ? 'Live' : 'Closed'}</span></div>
     <div class="stat">
-      <div><div class="label">Total rake</div><div class="v">${money(sum(all, ([,t]) => t.rake))}</div></div>
-      <div><div class="label">House net</div><div class="v ${sum(all, ([,t]) => t.net) >= 0 ? 'win' : 'loss'}">${money(sum(all, ([,t]) => t.net))}</div></div>
-      <div><div class="label">Total buy-ins</div><div class="v">${money(sum(all, ([,t]) => t.buyin))}</div></div>
-      <div><div class="label">Avg players</div><div class="v">${list.length ? Math.round(sum(all, ([,t]) => t.players) / list.length * 10) / 10 : 0}</div></div>
+      <div><div class="label">Rake</div><div class="v">${money(ct.rake)}</div></div>
+      <div><div class="label">House net</div><div class="v ${ct.net >= 0 ? 'win' : 'loss'}">${money(ct.net)}</div></div>
+      <div><div class="label">Buy-ins</div><div class="v">${money(ct.buyin)}</div></div>
+      <div><div class="label">Players</div><div class="v">${ct.players}</div></div>
     </div>
-    ${closed.length < list.length ? `<div class="small muted">${list.length - closed.length} session${list.length - closed.length === 1 ? ' is' : 's are'} still live.</div>` : ''}
+    <div class="small muted">${past ? `${past} earlier session${past === 1 ? '' : 's'} below. Totals across all nights are in Reports.` : 'Totals across all nights are in Reports.'}</div>
   </div>`;
   return head + all.map(([n,t]) => {
     const rows = nightPlayers(n).map(pid => [pid, playerLedger(n, pid)]).filter(([,l]) => l.e.length);
