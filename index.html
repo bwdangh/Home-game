@@ -272,6 +272,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 .bookrow .amt.out{color:var(--owes-player)}
 .booksboard h2{font-size:1.05rem}
 .bookrow .grow .small{font-size:.75rem}
+.pill.gn{background:rgba(46,230,166,.14);color:#7ff0c8}
 </style>
 
 </head>
@@ -282,7 +283,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '19 · This session only';
+const APP_VERSION = '20 · Night expenses in Expenses';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Cash App','Apple Pay','PayPal','Other']; // Dinesh doesn't take Zelle or Card from players
@@ -867,15 +868,20 @@ function viewPlayers(){
 }
 
 function viewExpenses(){
-  const list = [...D.expenses].sort((a,b) => b.date.localeCompare(a.date));
-  const head = `<div class="grow"><h1>Monthly Expenses</h1><div class="sub">Costs not tied to one night</div></div><button class="btn sm" data-act="newExpense">+ Expense</button>`;
-  if (!list.length) return [head, `<div class="card empty"><div><h2>No monthly expenses yet</h2><p class="small">Record rent, new cards, chips or anything else that isn't part of one night.</p></div><button class="btn" data-act="newExpense">Add an expense</button></div>`];
+  // Game-night expenses (Settle tab) show here automatically, read-only; they're already counted in each night's house net.
+  const nightRows = D.nights.filter(n => n.expense > 0).map(n => ({ night: n.id, date: n.date, desc: n.expenseNote || "Tonight's expenses", amount: n.expense, method: n.expenseMethod || 'Cash' }));
+  const list = [...D.expenses, ...nightRows].sort((a,b) => b.date.localeCompare(a.date));
+  const head = `<div class="grow"><h1>Expenses</h1><div class="sub">Monthly costs plus each game night's expenses</div></div><button class="btn sm" data-act="newExpense">+ Expense</button>`;
+  if (!list.length) return [head, `<div class="card empty"><div><h2>No expenses yet</h2><p class="small">Record rent, new cards, chips or anything else here. Expenses you add on a night's Settle tab show up here automatically.</p></div><button class="btn" data-act="newExpense">Add an expense</button></div>`];
   const months = [...new Set(list.map(x => x.date.slice(0,7)))];
+  const rowStyle = 'background:none;border:0;padding:6px 0;border-top:1px solid var(--line);text-align:left;cursor:pointer;color:var(--ink)';
   return [head, months.map(m => {
-    const items = list.filter(x => x.date.startsWith(m));
+    const items = list.filter(x => x.date.startsWith(m)), fromNights = sum(items.filter(x => x.night), x => x.amount);
     return `<div class="card stack"><div class="split"><h2>${fmtMonth(m)}</h2><b class="num">${money(sum(items, x => x.amount))}</b></div>
-      ${items.map(x => `<button class="row tap" style="background:none;border:0;padding:6px 0;border-top:1px solid var(--line);text-align:left;cursor:pointer;color:var(--ink)" data-edit-expense="${x.id}">
-        <span class="grow"><b>${esc(x.desc || x.category)}</b><div class="small muted">${esc(fmtDate(x.date))} · ${esc(x.category)} · ${esc(x.method)}</div></span><b class="num">${money(x.amount)}</b></button>`).join('')}
+      ${fromNights ? `<div class="small muted num">Includes ${money(fromNights)} from game nights · monthly costs ${money(sum(items.filter(x => !x.night), x => x.amount))}</div>` : ''}
+      ${items.map(x => x.night
+        ? `<button class="row tap" style="${rowStyle}" data-open-night="${x.night}" data-goto="close"><span class="grow"><b>${esc(x.desc)}</b> <span class="pill gn">Game night</span><div class="small muted">${esc(fmtDate(x.date))} · ${esc(x.method)}</div></span><b class="num">${money(x.amount)}</b></button>`
+        : `<button class="row tap" style="${rowStyle}" data-edit-expense="${x.id}"><span class="grow"><b>${esc(x.desc || x.category)}</b><div class="small muted">${esc(fmtDate(x.date))} · ${esc(x.category)} · ${esc(x.method)}</div></span><b class="num">${money(x.amount)}</b></button>`).join('')}
     </div>`;
   }).join('')];
 }
@@ -1494,7 +1500,7 @@ document.addEventListener('click', e => {
   const d = t.dataset;
   if (d.key) return keyPress(d.key);
   if (d.tab){ UI.tab = d.tab; if (d.tab === 'nights') UI.nightId = null; UI.resetScroll = true; render(); return; }
-  if (d.openNight){ UI.tab = 'nights'; UI.nightId = d.openNight; UI.nightTab = night(d.openNight)?.status === 'closed' ? 'close' : 'money'; UI.resetScroll = true; render(); return; }
+  if (d.openNight){ UI.tab = 'nights'; UI.nightId = d.openNight; UI.nightTab = d.goto || (night(d.openNight)?.status === 'closed' ? 'close' : 'money'); UI.resetScroll = true; render(); return; }
   if (d.nightTab){ UI.nightTab = d.nightTab; render(); return; }
   if (d.report){ UI.report = d.report; render(); return; }
   if (d.reportPlayer){ UI.reportPlayer = d.reportPlayer; render(); return; }
