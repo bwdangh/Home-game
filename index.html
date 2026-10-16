@@ -283,7 +283,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);outline:none;bo
 (() => {
 'use strict';
 const KEY = 'homeGameLedger.v1';
-const APP_VERSION = '20 · Night expenses in Expenses';
+const APP_VERSION = '21 · Back in after cash out';
 const MAX_PLAYERS = 40;
 const GAME_TYPES = ['2/5 NLH','5/10 NLH','2/5 Omaha'];
 const METHODS = ['Cash','Venmo','Cash App','Apple Pay','PayPal','Other']; // Dinesh doesn't take Zelle or Card from players
@@ -346,7 +346,9 @@ function playerLedger(n, pid){
   const by = k => sum(e.filter(x => x.kind === k), x => x.amount);
   const buyin = by('buyin'), bpaid = by('bpay'), cashout = by('cashout'), cpaid = by('cpay');
   return { e, buyin, bpaid, cashout, cpaid, owesHouse: buyin - bpaid, houseOwes: cashout - cpaid, result: cashout - buyin,
-    buyins: e.filter(x => x.kind === 'buyin').length, checkedOut: e.some(x => x.kind === 'cashout') };
+    // Out only if the latest cash-out came after the latest buy-in, so a player can come back for another round.
+    buyins: e.filter(x => x.kind === 'buyin').length,
+    checkedOut: e.some(x => x.kind === 'cashout') && Math.max(...e.filter(x => x.kind === 'cashout').map(x => x.t)) > Math.max(0, ...e.filter(x => x.kind === 'buyin').map(x => x.t)) };
 }
 // What the house still owes a player from cash-outs put "On books", minus payoffs recorded later.
 // On-books balances carried across nights, minus payoffs recorded later. dir 'out' = house paid the player, 'in' = player paid the house.
@@ -586,6 +588,7 @@ function playerCard(n, pid){
   const btns = [
     !l.checkedOut ? `<button class="btn ghost" data-act="rebuy" data-pid="${pid}">${l.buyin ? 'Rebuy' : 'Buy in'}</button>` : '',
     !l.checkedOut && l.buyin ? `<button class="btn ghost" data-act="cashout" data-pid="${pid}">Cash Out</button>` : '',
+    l.checkedOut ? `<button class="btn ghost" data-act="backin" data-pid="${pid}">Back in</button>` : '',
     l.checkedOut && l.houseOwes > 0 ? `<button class="btn ghost" data-act="paybalance" data-pid="${pid}">Pay balance</button>` : '',
     l.checkedOut && l.owesHouse > 0 ? `<button class="btn ghost" data-act="collect" data-pid="${pid}">Collect balance</button>` : '',
     `<button class="btn ghost" data-act="notes" data-pid="${pid}">Notes</button>`].join('');
@@ -597,7 +600,7 @@ function playerCard(n, pid){
     <div class="minis num">
       <div><div class="label">Buy-in${l.buyins > 1 ? 's ×' + l.buyins : ''}</div><div class="v">${money(l.buyin)}</div></div>
       <div><div class="label">Paid in</div><div class="v ${l.bpaid ? 'in' : ''}">${money(l.bpaid - netted - sum(l.e.filter(x => x.kind === 'bpay' && x.method === BOOKS), x => x.amount))}</div></div>
-      <div><div class="label">Cash-out</div><div class="v">${l.checkedOut ? money(l.cashout) : '—'}</div></div>
+      <div><div class="label">Cash-out</div><div class="v">${l.cashout ? money(l.cashout) : '—'}</div></div>
     </div>
     <div class="stack" style="gap:3px">
       <div class="statusline">${status}</div>
@@ -1103,13 +1106,18 @@ function defaultSeat(n, pid, preset){
   return 0;
 }
 
-function checkinSheet(n, presetSeat, waitOnly){
+function checkinSheet(n, presetSeat, waitOnly, presetPid){
   const inIds = nightPlayers(n);
-  const avail = D.players.filter(p => !inIds.includes(p.id)).sort((a,b) => (b.regular - a.regular) || a.name.localeCompare(b.name));
-  const firstPid = avail[0]?.id || '__new';
+  const byName = (a,b) => (b.regular - a.regular) || a.name.localeCompare(b.name);
+  const fresh = D.players.filter(p => !inIds.includes(p.id)).sort(byName);
+  // Players who cashed out tonight and left their seat can come back for another round.
+  const back = D.players.filter(p => inIds.includes(p.id) && playerLedger(n, p.id).checkedOut).sort(byName);
+  const avail = [...back, ...fresh];
+  const firstPid = presetPid && avail.some(p => p.id === presetPid) ? presetPid : avail[0]?.id || '__new';
   const seat0 = waitOnly ? 0 : defaultSeat(n, firstPid === '__new' ? null : firstPid, presetSeat);
   openSheet(`<h2>Check in player</h2>
-    <div class="field"><label for="ciPlayer">Player</label><select id="ciPlayer">${avail.map(p => `<option value="${p.id}">${p.regular ? '★ ' : ''}${esc(p.name)}${p.prefSeat ? ' · seat ' + p.prefSeat : ''}</option>`).join('')}<option value="__new" ${firstPid === '__new' ? 'selected' : ''}>+ Create new player profile…</option></select></div>
+    <div class="field"><label for="ciPlayer">Player</label><select id="ciPlayer">${(() => { const opt = p => `<option value="${p.id}" ${p.id === firstPid ? 'selected' : ''}>${p.regular ? '★ ' : ''}${esc(p.name)}${p.prefSeat ? ' · seat ' + p.prefSeat : ''}</option>`;
+      return (back.length ? `<optgroup label="Back for another round">${back.map(opt).join('')}</optgroup>` : '') + (fresh.length ? (back.length ? `<optgroup label="Roster">${fresh.map(opt).join('')}</optgroup>` : fresh.map(opt).join('')) : ''); })()}<option value="__new" ${firstPid === '__new' ? 'selected' : ''}>+ Create new player profile…</option></select></div>
     <div class="stack" id="ciNew" ${firstPid === '__new' ? '' : 'hidden'}>
       ${contactBtn('ciFill', 'Fill from Contacts')}
       <div class="field"><label for="ciName">Name</label><input id="ciName" autocomplete="name"></div>
@@ -1135,7 +1143,8 @@ function checkinSheet(n, presetSeat, waitOnly){
     }
     const seat = parseInt(val('ciSeat')) || 0;
     if (seat && takenSeats(n, pid).includes(seat)) return `Seat ${seat} is taken.`;
-    n.rsvps.push({ pid, t: Date.now(), seat: seat || null, notes:'' });
+    const prev = rsvp(n, pid);
+    if (prev) prev.seat = seat || null; else n.rsvps.push({ pid, t: Date.now(), seat: seat || null, notes:'' });
     if (amt) recordBuyin(n, pid, amt, lines);
     toast(seat ? `${pname(pid)} in seat ${seat}` : `${pname(pid)} added to waitlist`);
   });
@@ -1198,7 +1207,7 @@ function cashoutSheet(n, pid){
   const update = () => {
     const chips = toCents(amt.value), box = document.getElementById('coPrev');
     if (!(chips >= 0) || amt.value.trim() === ''){ box.innerHTML = '<span class="muted">Enter the chip count to see who pays whom.</span>'; return; }
-    const net = chips - owed, res = chips - l.buyin;
+    const net = chips - owed, res = chips + l.cashout - l.buyin; // includes earlier rounds tonight
     const lbl = sheetEl.querySelector('[data-paylines] > label');
     box.innerHTML = `<div class="split"><span>Chips</span><b>${money(chips)}</b></div>
       ${owed ? `<div class="split"><span>Settle-at-end balance</span><b class="owes-house">−${money(owed)}</b></div>` : ''}
@@ -1528,6 +1537,7 @@ document.addEventListener('click', e => {
       });
     case 'backNights': UI.nightId = null; render(); return;
     case 'checkin': return checkinSheet(n, parseInt(d.seat) || 0, !!d.wait);
+    case 'backin': return checkinSheet(n, 0, false, d.pid);
     case 'rebuy': return rebuySheet(n, d.pid);
     case 'cashout': return cashoutSheet(n, d.pid);
     case 'paybalance': return balanceSheet(n, d.pid, 'cpay');
